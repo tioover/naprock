@@ -53,18 +53,25 @@ def valuation(matrix):
             y = int(num % b)
             m = abs(i - x)
             n = abs(j - y)
-            value += m*m+n*n
+            value += m+n  # 曼哈顿距离
     return float(value)
 
 
-def order(l):
-    num = 0
-    prev = l[0]
-    for i in range(1, len(l)):
-        if l[i] < prev:
-            num += 1
-            prev = l[i]
-    return num
+def select(matrix):
+    min_ = float('inf')
+    pos = None
+    for i in range(width):
+        for j in range(width):
+            for d in direction:
+                try:
+                    value = valuation(turn(matrix, d, (i, j))[0])
+                except DoNot:
+                    pass
+                else:
+                    if value < min_:
+                        min_ = value
+                        pos = (i, j)
+    return min_, pos
 
 
 def random_matrix():
@@ -85,12 +92,14 @@ def to_num(matrix):
 
 def solve(matrix, center=None):
     if center is None:
-        center = get_zero(matrix)
+        # center = get_zero(matrix)
+        center = select(matrix)[1]
     open = [(matrix, center, valuation(matrix))]
     close = []
 
     while True:
         matrix, center, value = open.pop()
+        print(value, matrix)
         if matrix in close:
             continue
         if value == 0:
@@ -101,6 +110,8 @@ def solve(matrix, center=None):
             except DoNot:
                 continue
             open.append((new_node, pos, valuation(new_node)))
+        value, pos = select(matrix)
+        open.append((matrix, pos, value))
         open.sort(key=lambda x: x[2], reverse=True)
         close.append(matrix)
 
