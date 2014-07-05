@@ -1,6 +1,5 @@
 import time
 import heapq
-import solve_old
 from copy import deepcopy as copy
 from random import shuffle
 
@@ -111,11 +110,6 @@ def main():
     shuffle(step)
     m = turn_pipeline(m, step)
     print(m)
-    print('old')
-    t = time.time()
-    solve_old.solve(m)
-    print(time.time() - t)
-    print('new')
     t = time.time()
     solve(m)
     print(time.time() - t)
