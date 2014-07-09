@@ -9,17 +9,18 @@ class Node:
         self.center = center
         self.step = step
         self.depth = parent.depth + 1 if parent else depth
-        self.matrix_distance = self.valuation()
-        self.value = sum(self.matrix_distance)
+        self.value = self.valuation()
 
     def valuation(self):
         m = self.matrix
         x, y = self.shape
-        return tuple(
-            (abs(int(i/y) - int(m[i]/y)) + abs((i % y) - (m[i] % y)) for i in range(len(m))))
+        result = 0
+        for i in range(x*y):
+            result += abs(int(i/y) - int(m[i]/y)) + abs((i % y) - (m[i] % y))
+        return result
 
     def __lt__(self, other):
-        return True  # for heap
+        return self.depth < other.depth  # for heap
 
     def __repr__(self):
         x, y = self.shape
@@ -44,7 +45,7 @@ class Heap:
 def node_generator(node: Node):
     center = node.center
     line, row = node.shape
-    matrix = list(node.matrix)
+    matrix = node.matrix
 
     shift_list = []
     up = center - row
@@ -62,12 +63,12 @@ def node_generator(node: Node):
         shift_list.append((down, 'd'))
 
     for shift, name in shift_list:
-        m = matrix[:]
+        m = list(matrix)
         m[shift], m[center] = m[center], m[shift]
-        yield Node(node, tuple(m), shift, (name, node.step))
+        yield Node(node, tuple(m), shift, name)
 
 
-def solve_with_node(node: Node, max_loop=0x1000, close=None):
+def solve_with_node(node: Node, max_loop=0x50, close=None):
     open = Heap()
     close = close or {}
     open.push(node)
@@ -80,29 +81,42 @@ def solve_with_node(node: Node, max_loop=0x1000, close=None):
             node = open.pop()
         except IndexError:
             break
-        if node.value < solve_node.value:
+        if node.value == 0:
             solve_node = node
-        if node.matrix in close:
+            break
+        elif node.matrix in close:
             if node.depth > close[node.matrix].depth:
                 close[node.matrix] = node
             continue
-        elif node.value == 0:
-            solve_node = node
-            break
         else:
             close[node.matrix] = node
+        if node.value < solve_node.value:
+            solve_node = node
         for new_node in node_generator(node):
             open.push(new_node)
-    return solve_node  # fail
+    return solve_node
+
+
+def solve_generator(node: Node):
+    for i in range(len(node.matrix)):
+        yield solve_with_node(Node(node, node.matrix, i, 'select '+str(i)))
 
 
 def make_root_node(matrix, shape):
-    return Node(None, matrix, 0, (), shape, 0)
+    return Node(None, matrix, 0, '', shape, 0)
 
 
 def solve(matrix, shape):
     node = make_root_node(matrix, shape)
-    return solve_with_node(node)
+    for i in range(128):
+        print(i, node.center, node.value)
+        for new_solve in solve_generator(node):
+            value = new_solve.value
+            if value == 0:
+                return new_solve
+            elif new_solve.value < node.value:
+                node = new_solve
+    return node
 
 
 def main():
