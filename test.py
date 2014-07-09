@@ -3,15 +3,15 @@ from random import shuffle
 
 
 def show_step(n):
-    step = n.step
     result = []
-    while step[1] is not ():
-        result.append(step[0])
-        step = step[1]
-    return "".join(reversed(result))
+    while n.parent is not None:
+        result.append(n.step)
+        n = n.parent
+    return " ".join(reversed(result))
 
 
-a, b = 4, 4
+x = 10
+a, b = x, x
 problem = list(range(a*b))
 shuffle(problem)
 node = solve.solve(tuple(problem), (a, b))
