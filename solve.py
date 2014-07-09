@@ -1,4 +1,7 @@
+#!/bin/env pypy3
 from heapq import heappop, heappush
+from copy import copy
+from time import time
 
 
 class Node:
@@ -27,7 +30,7 @@ class Node:
         m = self.matrix
         result = ''
         for i in range(x):
-            result += str(m[i*y: (i+1)*y]) + '\n'
+            result += '|'.join(('%3d' % i for i in m[i*y: (i+1)*y])) + '\n'
         return result
 
 
@@ -68,7 +71,7 @@ def node_generator(node: Node):
         yield Node(node, tuple(m), shift, name)
 
 
-def solve_with_node(node: Node, max_loop=0x50, close=None):
+def solve_with_node(node: Node, max_loop=0x500, close=None):
     open = Heap()
     close = close or {}
     open.push(node)
@@ -99,16 +102,34 @@ def solve_with_node(node: Node, max_loop=0x50, close=None):
 
 def solve_generator(node: Node):
     for i in range(len(node.matrix)):
-        yield solve_with_node(Node(node, node.matrix, i, 'select '+str(i)))
+        now = node
+        if i != node.center:
+            now = copy(node)
+            now.center = i
+            now.step = 'select '+str(i)
+            now.parent = node
+        yield solve_with_node(now)
 
 
-def make_root_node(matrix, shape):
+def goal_reduce(matrix, goal):
+    new = [None for i in range(len(matrix))]
+    for i, num in enumerate(goal):
+        pos = matrix.index(num)
+        new[pos] = i
+    return tuple(new)
+
+
+def make_root_node(matrix, shape, goal):
+    if goal:
+        matrix = goal_reduce(matrix, goal)
     return Node(None, matrix, 0, '', shape, 0)
 
 
-def solve(matrix, shape):
-    node = make_root_node(matrix, shape)
-    for i in range(128):
+def solve(matrix, shape, goal):
+    node = make_root_node(matrix, shape, goal)
+    t = time()
+    i = 0
+    for i in range(16):
         print(i, node.center, node.value)
         for new_solve in solve_generator(node):
             value = new_solve.value
@@ -116,15 +137,23 @@ def solve(matrix, shape):
                 return new_solve
             elif new_solve.value < node.value:
                 node = new_solve
+    t = time() - t
+    print(t, t/i)
     return node
 
 
 def main():
     import sys
-    shape = tuple(map(int, sys.argv[1:3]))
+    l = sys.argv[1:3]
+    shape = tuple(map(int, l))
     x, y = shape
-    matrix = tuple(map(int, sys.argv[3:3+x*y]))
-    solve(matrix, shape)
+    l = sys.argv[3:]
+    l = l[:x*y]
+    matrix = tuple(map(int, l))
+    l = l[:x*y]
+    goal = tuple(map(int, l)) or None
+    assert not goal or len(goal) == x*y
+    solve(matrix, shape, goal)
 
 
 if __name__ == '__main__':

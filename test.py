@@ -10,7 +10,7 @@ def show_step(n):
     return " ".join(reversed(result))
 
 
-x = 10
+x = 4
 a, b = x, x
 problem = list(range(a*b))
 shuffle(problem)
