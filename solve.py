@@ -1,160 +1,207 @@
-#!/bin/env pypy3
-from heapq import heappop, heappush
-from copy import copy
-from time import time
+use std::rc::Rc;
+use std::num::abs;
+use std::collections::HashMap;
+//use std::collections::PriorityQueue;
+
+type N = int;
+type Parent = Option<Rc<Node>>;
+type Matrix = Rc<Vec<N>>;
+type Shape = (N, N);
+type Value = int;
+static X: N = 4;
+static Y: N = 4;
 
 
-class Node:
-    def __init__(self, parent, matrix, center, step, shape=None, depth=None):
-        self.shape = parent.shape if parent else shape
-        self.parent = parent
-        self.matrix = matrix
-        self.center = center
-        self.step = step
-        self.depth = parent.depth + 1 if parent else depth
-        self.value = self.valuation()
+enum Step
+{
+    Start = 0,
+    Left = 1,
+    Right = 2,
+    Up = 3,
+    Down = 4,
+}
 
-    def valuation(self):
-        m = self.matrix
-        x, y = self.shape
-        result = 0
-        for i in range(x*y):
-            result += abs(int(i/y) - int(m[i]/y)) + abs((i % y) - (m[i] % y))
-        return result
+struct Node
+{
+    matrix: Matrix,
+    shape: Shape,
+    parent: Parent,
+    center: N,
+    depth: N,
+    value: Value,
+    step: Step,
+}
 
-    def __lt__(self, other):
-        return self.depth < other.depth  # for heap
+impl Node
+{
+    fn new(parent: Rc<Node>, matrix: Matrix, step: Step, center: N) -> Node
+    {
+        let value = Node::valuation(matrix.clone(), parent.shape);
+        Node {
+            matrix: matrix,
+            shape: parent.shape,
+            parent: Some(parent.clone()),
+            center: center,
+            depth: parent.depth + 1,
+            value: value,
+            step: step,
+        }
+    }
 
-    def __repr__(self):
-        x, y = self.shape
-        m = self.matrix
-        result = ''
-        for i in range(x):
-            result += '|'.join(('%3d' % i for i in m[i*y: (i+1)*y])) + '\n'
-        return result
+    fn new_root(matrix: Matrix, shape: Shape, center: N) -> Node
+    {
+        let value = Node::valuation(matrix.clone(), shape);
+        Node {
+            matrix: matrix,
+            shape: shape,
+            center: center,
+            depth: 0,
+            value: value,
+            step: Start,
+            parent: None,
+        }
+    }
 
+    fn valuation(matrix: Matrix, shape: Shape) -> Value
+    {
+        let mut value = 0i;
+        let (x, y) = shape;
+        for i in range(0, x*y) {
+            let a = matrix.get(i as uint);
+            value += abs(i/y - a/y) + abs((i % y) - (a % y));
+        }
+        value as Value
+    }
 
-class Heap:
-    def __init__(self):
-        self.heap = []
-
-    def push(self, node):
-        heappush(self.heap, (node.value, node))
-
-    def pop(self):
-        return heappop(self.heap)[1]
-
-
-def node_generator(node: Node):
-    center = node.center
-    line, row = node.shape
-    matrix = node.matrix
-
-    shift_list = []
-    up = center - row
-    down = center + row
-    left = center - 1
-    right = center + 1
-
-    if right % row != 0:
-        shift_list.append((right, 'r'))
-    if center % row != 0:
-        shift_list.append((left, 'l'))
-    if up >= 0:
-        shift_list.append((up, 'u'))
-    if down < len(matrix):
-        shift_list.append((down, 'd'))
-
-    for shift, name in shift_list:
-        m = list(matrix)
-        m[shift], m[center] = m[center], m[shift]
-        yield Node(node, tuple(m), shift, name)
-
-
-def solve_with_node(node: Node, max_loop=0x500, close=None):
-    open = Heap()
-    close = close or {}
-    open.push(node)
-    solve_node = node
-    i = 0
-
-    while i < max_loop:
-        i += 1
-        try:
-            node = open.pop()
-        except IndexError:
-            break
-        if node.value == 0:
-            solve_node = node
-            break
-        elif node.matrix in close:
-            if node.depth > close[node.matrix].depth:
-                close[node.matrix] = node
-            continue
-        else:
-            close[node.matrix] = node
-        if node.value < solve_node.value:
-            solve_node = node
-        for new_node in node_generator(node):
-            open.push(new_node)
-    return solve_node
+    fn print(&self)
+    {
+        println!("matrix: {} value: {}", self.matrix.as_slice(), self.value);
+    }
+}
 
 
-def solve_generator(node: Node):
-    for i in range(len(node.matrix)):
-        now = node
-        if i != node.center:
-            now = copy(node)
-            now.center = i
-            now.step = 'select '+str(i)
-            now.parent = node
-        yield solve_with_node(now)
+//impl Ord for Node
+//{
+//    fn cmp(&self, other: &Node) -> Ordering{
+//        if self.value > other.value {Greater} else {Less}
+//    }
+//}
+//impl Eq for Node {}
+//impl PartialEq for Node {}
+//impl PartialOrd for Node
+//{
+//    // fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
+//
+//    // fn lt(&self, other: &Self) -> bool { ... }
+//    // fn le(&self, other: &Self) -> bool { ... }
+//    // fn gt(&self, other: &Self) -> bool { ... }
+//    // fn ge(&self, other: &Self) -> bool { ... }
+//}
+
+fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
+{
+    let (x, y) = parent.shape;
+    let max = x*y;
+    let center = parent.center;
+    let mut matrix = parent.matrix.deref().clone();
+    let shift = match step {
+        Up => {
+            let shift = center - x;
+            if shift >= 0 {Some(shift)} else {None}
+        },
+        Down => {
+            let shift = center + x;
+            if shift < max {Some(shift)} else {None}
+        },
+        Left => {
+            let shift = center - 1;
+            if center % y != 0 {Some(shift)} else {None}
+        },
+        Right => {
+            let shift = center + 1;
+            if shift % y != 0 {Some(shift)} else {None}
+        },
+        Start => fail!("Start?")
+    };
+    match shift {
+        None => None,
+        Some(shift) => {
+            {
+                let c = center as uint;
+                let s = shift as uint;
+                let matrix_slice = matrix.as_mut_slice();
+                let swap = matrix_slice[c];
+                matrix_slice[c] = matrix_slice[s];
+                matrix_slice[s] = swap;
+            }
+            Some(Rc::new(Node::new(parent, Rc::new(matrix), step, shift)))
+        }
+    }
+}
 
 
-def goal_reduce(matrix, goal):
-    new = [None for i in range(len(matrix))]
-    for i, num in enumerate(goal):
-        pos = matrix.index(num)
-        new[pos] = i
-    return tuple(new)
+fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
+{
+    // TODO: binary search
+    match open.len() {
+        0 => open.push(node),
+        len => {
+            for i in range(0u, len) {
+                if open.get(i).value < node.value {
+                    open.insert(i, node.clone());
+                    break;
+                }
+                else if i == len - 1 {
+                    open.push(node.clone());
+                }
+            }
+        }
+    };
+}
 
 
-def make_root_node(matrix, shape, goal):
-    if goal:
-        matrix = goal_reduce(matrix, goal)
-    return Node(None, matrix, 0, '', shape, 0)
+fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
+    let step = [Up, Down, Left, Right];
+    for i in range(0u, 4) {
+        match spread(node.clone(), step[i]) {
+            None => {},
+            Some(new_node) => insert(open, new_node),
+        };
+    };
+}
 
+fn solve(root: Rc<Node>) -> Rc<Node>
+{
+    let mut open: Vec<Rc<Node>> = Vec::new();
+    let mut close = HashMap::new();
+    let mut solve_node = root.clone();
+    let max_loop = 1000u;
+    open.push(root);
+    for _ in range(0, max_loop) {
+        match open.pop() {
+            None => fail!("open empty"),
+            Some(node) => {
+                let value = node.value;
+                if value == 0 {return node;}
+                else if close.contains_key(&node.matrix) {continue;} // TODO: update
+                else {close.insert(node.matrix.clone(), node.clone());}
+                if node.value < solve_node.value {solve_node = node.clone()};
+                add(&mut open, node);
+            }
+        }
+    }
+    solve_node
+}
 
-def solve(matrix, shape, goal):
-    node = make_root_node(matrix, shape, goal)
-    t = time()
-    i = 0
-    for i in range(16):
-        print(i, node.center, node.value)
-        for new_solve in solve_generator(node):
-            value = new_solve.value
-            if value == 0:
-                return new_solve
-            elif new_solve.value < node.value:
-                node = new_solve
-    t = time() - t
-    print(t, t/i)
-    return node
-
-
-def main():
-    import sys
-    l = sys.argv[1:3]
-    shape = tuple(map(int, l))
-    x, y = shape
-    l = sys.argv[3:]
-    l = l[:x*y]
-    matrix = tuple(map(int, l))
-    l = l[:x*y]
-    goal = tuple(map(int, l)) or None
-    assert not goal or len(goal) == x*y
-    solve(matrix, shape, goal)
-
-
-if __name__ == '__main__':
-    main()
+fn main()
+{
+    let mut matrix: Vec<N> = range(0, X*Y).collect();
+    {
+        use std::rand::{task_rng, Rng};
+        let m = matrix.as_mut_slice();
+        let mut rng = task_rng();
+        rng.shuffle(m);
+    }
+    let root = Rc::new(Node::new_root(Rc::new(matrix), (X, Y), 0));
+    solve(root).print()
+}
