@@ -1,67 +1,109 @@
 use std::rc::Rc;
 use std::num::abs;
 use std::collections::HashMap;
-use std::collections::PriorityQueue;
+//use std::collections::PriorityQueue;
 
 type N = int;
 type Parent = Option<Rc<Node>>;
-type Matrix = Vec<N>;
+type Matrix = Rc<Vec<N>>;
+type Shape = (N, N);
+type Value = int;
 static X: N = 3;
 static Y: N = 3;
 
 
 enum Step
 {
-    Up,
-    Down,
-    Left,
-    Right,
-    Start,
+    Start = 0,
+    Left = 1,
+    Right = 2,
+    Up = 3,
+    Down = 4,
 }
-
 
 struct Node
 {
     matrix: Matrix,
-    shape: (N, N),
+    shape: Shape,
     parent: Parent,
     center: N,
     depth: N,
-    value: f32,
+    value: Value,
     step: Step,
 }
 
-fn new(matrix: Box<Matrix>, shape: (N, N), center: N) -> Node
+impl Node
 {
-    let value = valuation(matrix, shape);
-    Node {
-        matrix: *matrix,
-        shape: shape,
-        parent: None,
-        center: center,
-        depth: 0,
-        value: value,
-        step: Start
+    fn new(parent: Rc<Node>, matrix: Matrix, step: Step, center: N) -> Node
+    {
+        let value = Node::valuation(matrix.clone(), parent.shape);
+        Node {
+            matrix: matrix,
+            shape: parent.shape,
+            parent: Some(parent.clone()),
+            center: center,
+            depth: parent.depth + 1,
+            value: value,
+            step: step,
+        }
+    }
+
+    fn new_root(matrix: Matrix, shape: Shape, center: N) -> Node
+    {
+        let value = Node::valuation(matrix.clone(), shape);
+        Node {
+            matrix: matrix,
+            shape: shape,
+            center: center,
+            depth: 0,
+            value: value,
+            step: Start,
+            parent: None,
+        }
+    }
+
+    fn valuation(matrix: Matrix, shape: Shape) -> Value
+    {
+        let mut value = 0i;
+        let (x, y) = shape;
+        for i in range(0, x*y) {
+            let a = matrix.get(i as uint);
+            value += abs(i/y - a/y) + abs((i % y) - (a % y));
+        }
+        value as Value
+    }
+
+    fn print(&self)
+    {
+        println!("matrix: {} value: {}", self.matrix.as_slice(), self.value);
     }
 }
 
-fn valuation(matrix: &Matrix, shape: (N, N)) -> f32
-{
-    let mut value = 0i;
-    let (x, y) = shape;
-    for i in range(0, x*y) {
-        let a = matrix.get(i as uint);
-        value += abs(i/y - a/y) + abs((i % y) - (a % y));
-    }
-    (100000 - value) as f32
-}
+
+//impl Ord for Node
+//{
+//    fn cmp(&self, other: &Node) -> Ordering{
+//        if self.value > other.value {Greater} else {Less}
+//    }
+//}
+//impl Eq for Node {}
+//impl PartialEq for Node {}
+//impl PartialOrd for Node
+//{
+//    // fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
+//
+//    // fn lt(&self, other: &Self) -> bool { ... }
+//    // fn le(&self, other: &Self) -> bool { ... }
+//    // fn gt(&self, other: &Self) -> bool { ... }
+//    // fn ge(&self, other: &Self) -> bool { ... }
+//}
 
 fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
 {
     let (x, y) = parent.shape;
     let max = x*y;
     let center = parent.center;
-    let mut matrix = parent.matrix.clone();
+    let mut matrix = parent.matrix.deref().clone();
     let shift = match step {
         Up => {
             let shift = center - x;
@@ -92,48 +134,48 @@ fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
                 matrix_slice[c] = matrix_slice[s];
                 matrix_slice[s] = swap;
             }
-            let value = valuation(&matrix, parent.shape);
-            Some(Rc::new(Node{
-                matrix: matrix,
-                shape: parent.shape,
-                parent: Some(parent.clone()),
-                center: shift,
-                depth: parent.depth + 1,
-                value: value,
-                step: step,
-            }))
+            Some(Rc::new(Node::new(parent, Rc::new(matrix), step, shift)))
         }
     }
 }
 
-fn print_node(node: Rc<Node>)
-{
-    println!("matrix: {} value: {}", node.matrix.as_slice(), node.value);
+
+fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
+    let step = [Up, Down, Left, Right];
+    for i in range(0u, 4) {
+        match spread(node.clone(), step[i]) {
+            None => {},
+            Some(new_node) => {open.push(new_node);}
+        };
+    };
 }
 
 fn solve(root: Rc<Node>) -> Rc<Node>
 {
-    let mut open = PriorityQueue::new();
+    let mut open: Vec<Rc<Node>> = Vec::new();
     let mut close = HashMap::new();
-    let mut solve_node = root;
-    let MAX_LOOP = 10000u;
-    open.push((root.value, box root));
-    for i in range(0, MAX_LOOP) {
-        match open.pop() { None => fail!("open empty"), Some((value, node)) => {
-            if value == 0 {return node;}
-            else if close.contains_key(&node.matrix) {continue;} // TODO: update
-            else {close.insert(node.matrix, node.copy())}
-            for step in [Up, Down, Left, Right] {
-                match spread(node, step) { None => None,
-                    Some(new_node) => open.push((new_node.value, box new_node))}
-            }}
+    let mut solve_node = root.clone();
+    let max_loop = 10000u;
+    open.push(root);
+    for _ in range(0, max_loop) {
+        match open.pop() {
+            None => fail!("open empty"),
+            Some(node) => {
+                let value = node.value;
+                if value == 0 {return node;}
+                else if close.contains_key(&node.matrix) {continue;} // TODO: update
+                else {close.insert(node.matrix.clone(), node.clone());}
+                if node.value < solve_node.value {solve_node = node.clone()};
+                add(&mut open, node);
+            }
         }
+        open.sort_by(|a, b| b.value.cmp(&a.value));
     }
     solve_node
 }
 
 fn main()
 {
-    let root = Rc::new(new(box vec!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), (X, Y), 0));
-    print_node(solve(root))
+    let root = Rc::new(Node::new_root(Rc::new(vec!(4, 1, 2, 3, 0, 5, 6, 8, 7, 9)), (X, Y), 0));
+    solve(root).print()
 }
