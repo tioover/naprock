@@ -8,8 +8,8 @@ type Parent = Option<Rc<Node>>;
 type Matrix = Rc<Vec<N>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 3;
-static Y: N = 3;
+static X: N = 4;
+static Y: N = 4;
 
 
 enum Step
@@ -140,12 +140,32 @@ fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
 }
 
 
+fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
+{
+    // TODO: binary search
+    match open.len() {
+        0 => open.push(node),
+        len => {
+            for i in range(0u, len) {
+                if open.get(i).value < node.value {
+                    open.insert(i, node.clone());
+                    break;
+                }
+                else if i == len - 1 {
+                    open.push(node.clone());
+                }
+            }
+        }
+    };
+}
+
+
 fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
     let step = [Up, Down, Left, Right];
     for i in range(0u, 4) {
         match spread(node.clone(), step[i]) {
             None => {},
-            Some(new_node) => {open.push(new_node);}
+            Some(new_node) => insert(open, new_node),
         };
     };
 }
@@ -155,7 +175,7 @@ fn solve(root: Rc<Node>) -> Rc<Node>
     let mut open: Vec<Rc<Node>> = Vec::new();
     let mut close = HashMap::new();
     let mut solve_node = root.clone();
-    let max_loop = 10000u;
+    let max_loop = 1000u;
     open.push(root);
     for _ in range(0, max_loop) {
         match open.pop() {
@@ -169,13 +189,19 @@ fn solve(root: Rc<Node>) -> Rc<Node>
                 add(&mut open, node);
             }
         }
-        open.sort_by(|a, b| b.value.cmp(&a.value));
     }
     solve_node
 }
 
 fn main()
 {
-    let root = Rc::new(Node::new_root(Rc::new(vec!(4, 1, 2, 3, 0, 5, 6, 8, 7, 9)), (X, Y), 0));
+    let mut matrix: Vec<N> = range(0, X*Y).collect();
+    {
+        use std::rand::{task_rng, Rng};
+        let m = matrix.as_mut_slice();
+        let mut rng = task_rng();
+        rng.shuffle(m);
+    }
+    let root = Rc::new(Node::new_root(Rc::new(matrix), (X, Y), 0));
     solve(root).print()
 }
