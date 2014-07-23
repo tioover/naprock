@@ -8,19 +8,21 @@ type Parent = Option<Rc<Node>>;
 type Matrix = Rc<Vec<N>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 4;
-static Y: N = 4;
+static X: N = 10;
+static Y: N = 10;
 
 
+#[deriving(Clone)]
 enum Step
 {
-    Start = 0,
-    Left = 1,
-    Right = 2,
-    Up = 3,
-    Down = 4,
+    Select,
+    Left,
+    Right,
+    Up,
+    Down,
 }
 
+#[deriving(Clone)]
 struct Node
 {
     matrix: Matrix,
@@ -57,7 +59,7 @@ impl Node
             center: center,
             depth: 0,
             value: value,
-            step: Start,
+            step: Select,
             parent: None,
         }
     }
@@ -75,30 +77,19 @@ impl Node
 
     fn print(&self)
     {
-        println!("matrix: {} value: {}", self.matrix.as_slice(), self.value);
+        let matrix = self.matrix.as_slice();
+        let (x, y) = self.shape;
+        for i in range(0, x as uint) {
+            let j = y as uint;
+            println!("{}", matrix.slice(i*j, i*j+j));
+        }
+        println!("value: {} center: [{}] {}\n",
+                 self.value, self.center, (self.center / y + 1, self.center % y + 1));
     }
 }
 
 
-//impl Ord for Node
-//{
-//    fn cmp(&self, other: &Node) -> Ordering{
-//        if self.value > other.value {Greater} else {Less}
-//    }
-//}
-//impl Eq for Node {}
-//impl PartialEq for Node {}
-//impl PartialOrd for Node
-//{
-//    // fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-//
-//    // fn lt(&self, other: &Self) -> bool { ... }
-//    // fn le(&self, other: &Self) -> bool { ... }
-//    // fn gt(&self, other: &Self) -> bool { ... }
-//    // fn ge(&self, other: &Self) -> bool { ... }
-//}
-
-fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
+fn turn(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
 {
     let (x, y) = parent.shape;
     let max = x*y;
@@ -106,11 +97,11 @@ fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
     let mut matrix = parent.matrix.deref().clone();
     let shift = match step {
         Up => {
-            let shift = center - x;
+            let shift = center - y;
             if shift >= 0 {Some(shift)} else {None}
         },
         Down => {
-            let shift = center + x;
+            let shift = center + y;
             if shift < max {Some(shift)} else {None}
         },
         Left => {
@@ -121,7 +112,7 @@ fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
             let shift = center + 1;
             if shift % y != 0 {Some(shift)} else {None}
         },
-        Start => fail!("Start?")
+        _ => fail!("turn arg error")
     };
     match shift {
         None => None,
@@ -142,7 +133,6 @@ fn spread(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
 
 fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
 {
-    // TODO: binary search
     match open.len() {
         0 => open.push(node),
         len => {
@@ -163,35 +153,77 @@ fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
 fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
     let step = [Up, Down, Left, Right];
     for i in range(0u, 4) {
-        match spread(node.clone(), step[i]) {
+        match turn(node.clone(), step[i]) {
             None => {},
-            Some(new_node) => insert(open, new_node),
+            Some(new_node) => {
+                //println!("add {}", match i {0 => "up", 1 => "down", 2 => "left", 3 => "right", _ => "erro"});
+                insert(open, new_node)
+            },
         };
     };
 }
 
-fn solve(root: Rc<Node>) -> Rc<Node>
+
+fn is_update(raw: &Rc<Node>, new: &Rc<Node>) -> bool {
+    (new.value < raw.value) || (new.value == raw.value && new.depth < raw.depth)
+}
+
+
+fn solve_with_node(root: Rc<Node>) -> Rc<Node>
 {
+    let max_loop = 1000u;
     let mut open: Vec<Rc<Node>> = Vec::new();
     let mut close = HashMap::new();
-    let mut solve_node = root.clone();
-    let max_loop = 1000u;
+    let mut solution = root.clone();
     open.push(root);
     for _ in range(0, max_loop) {
         match open.pop() {
-            None => fail!("open empty"),
+            None => {println!("ERROR: Open empty."); break},
             Some(node) => {
                 let value = node.value;
                 if value == 0 {return node;}
                 else if close.contains_key(&node.matrix) {continue;} // TODO: update
                 else {close.insert(node.matrix.clone(), node.clone());}
-                if node.value < solve_node.value {solve_node = node.clone()};
+                if is_update(&solution, &node) {solution = node.clone()};
                 add(&mut open, node);
             }
         }
     }
-    solve_node
+    solution
 }
+
+
+fn solve_loop(root: Rc<Node>) -> Rc<Node>
+{
+    let mut solution = solve_with_node(root.clone());
+    for i in range(0, root.matrix.len() as N) {
+        let mut now = root.deref().clone();
+        now.center = i;
+        now.parent = Some(root.clone());
+        now.depth += 1;
+        now.step = Select;
+        let now_solution = solve_with_node(Rc::new(now));
+        if now_solution.value == 0 {return now_solution;}
+
+        if is_update(&solution, &now_solution) {
+            solution = now_solution;
+        }
+    }
+    solution
+}
+
+
+fn solve(matrix: Rc<Vec<N>>) -> Rc<Node>
+{
+    let mut root = Rc::new(Node::new_root(matrix, (X, Y), 0));
+    for _ in range(0, 16u) {
+        root = solve_loop(root);
+        if root.value == 0 {break;}
+        root.print();
+    }
+    root
+}
+
 
 fn main()
 {
@@ -202,6 +234,5 @@ fn main()
         let mut rng = task_rng();
         rng.shuffle(m);
     }
-    let root = Rc::new(Node::new_root(Rc::new(matrix), (X, Y), 0));
-    solve(root).print()
+    solve(Rc::new(matrix)).print();
 }
