@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use std::num::abs;
 use std::collections::HashSet;
 use std::rand::{task_rng, Rng};
@@ -12,7 +12,7 @@ type Value = int;
 static X: N = 16;
 static Y: N = 16;
 static MAX_LOOP: uint = 10000u;
-static TASK_NUM: uint = 3;
+static TASK_NUM: uint = 8;
 static BASE: uint = 500;
 static THRESHOLD: uint = 200;
 
@@ -35,7 +35,9 @@ struct Node
     shape: Shape,
     center: N,
     value: Value,
-    steps: Vec<Step>,
+    parent: Option<Arc<Node>>,
+    step: Step,
+    depth: uint,
 }
 
 
@@ -50,22 +52,48 @@ impl Node
             println!("{}", matrix.slice(i*j, i*j+j));
         }
         println!("value: {} center: [{}] {} step: {}\n",
-                 self.value, self.center, (self.center / y + 1, self.center % y + 1), self.steps.len());
+                 self.value, self.center, (self.center / y + 1, self.center % y + 1), self.depth);
+    }
+
+    fn print_step(&self)
+    {
+        match self.step {
+            Up => println!("UP"),
+            Down => println!("DOWN"),
+            Left => println!("LEFT"),
+            Right => println!("RIGHT"),
+            Select => println!("Select {}", self.center),
+            Start => ()
+        }
+    }
+
+    fn print_steps(&self)
+    {
+        self.print_step();
+        let mut now = self.parent.clone();
+        loop {
+            match now {
+                None => break,
+                Some(node) => {node.print_step(); now = node.parent.clone();}
+            }
+        }
     }
 }
 
 fn valuation(matrix: &Matrix, shape: Shape) -> Value
 {
     let mut value: Value = 0;
+    let mut block = 0;
     let (x, y) = shape;
     for i in range(0, x*y) {
         let a = *matrix.get(i as uint) as int;
+        if a == i {block += 1}
         value += abs(i/y - a/y) + abs((i % y) - (a % y));
     }
-    value
+    value * 1000 + block
 }
 
-fn turn(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
+fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
 {
     let shape = parent.shape;
     let (x, y) = shape;
@@ -86,13 +114,15 @@ fn turn(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
                 let matrix_slice = matrix.as_mut_slice();
                 matrix_slice.swap(center as uint, shift as uint);
             }
-            Some(Rc::new(
+            Some(Arc::new(
                 Node {
                     value: valuation(&matrix, parent.shape),
                     matrix: matrix,
                     shape: shape,
-                    steps: parent.steps.clone().append_one(step),
+                    parent: Some(parent.clone()),
                     center: shift,
+                    step: step,
+                    depth: parent.depth + 1,
                 }
             ))
         }
@@ -100,7 +130,7 @@ fn turn(parent: Rc<Node>, step: Step) -> Option<Rc<Node>>
 }
 
 
-fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
+fn insert(open: &mut Vec<Arc<Node>>, node: Arc<Node>) -> ()
 {
     let value = node.value;
     let len = open.len();
@@ -122,7 +152,7 @@ fn insert(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> ()
     }
 }
 
-fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
+fn add(open: &mut Vec<Arc<Node>>, node: Arc<Node>) -> () {
     let mut shift = [Up, Down, Left, Right];
     task_rng().shuffle(shift);
     for step in shift.iter() {
@@ -134,27 +164,27 @@ fn add(open: &mut Vec<Rc<Node>>, node: Rc<Node>) -> () {
 }
 
 
-fn is_update(raw: &Rc<Node>, new: &Rc<Node>) -> bool {
-    (new.value < raw.value) || (new.value == raw.value && new.steps.len() < raw.steps.len())
+fn is_update(raw: &Arc<Node>, new: &Arc<Node>) -> bool {
+    (new.value < raw.value) || (new.value == raw.value && new.depth < raw.depth)
 }
 
 
 fn solve_with_node(
-        root: Node,
-        open: &mut Vec<Rc<Node>>,
+        root: Arc<Node>,
+        open: &mut Vec<Arc<Node>>,
         close: &mut HashSet<Vec<u8>>
-    ) -> Node
+    ) -> Arc<Node>
 {
     let mut update = 0;
-    let mut solution = Rc::new(root);
-    open.push(solution.clone());
+    let mut solution = root.clone();
+    open.push(root);
     for i in range(0, MAX_LOOP) {
         if i > BASE && i - update > THRESHOLD {break;}
         match open.pop() {
             None => {println!("ERROR: Open empty."); break},
             Some(node) => {
                 let value = node.value;
-                if value == 0 {return node.deref().clone();}
+                if value == 0 {return node;}
                 else if close.contains(&node.matrix) {continue;}
                 else {close.insert(node.matrix.clone());}
                 if is_update(&solution, &node) {
@@ -165,28 +195,28 @@ fn solve_with_node(
             }
         }
     }
-    solution.deref().clone()
+    solution
 }
 
-fn solve_loop(root: Rc<Node>) -> Rc<Node>
+fn solve_loop(root: Arc<Node>) -> Arc<Node>
 {
-    let (tx, rx): (Sender<Node>, Receiver<Node>) = comm::channel();
+    let (tx, rx): (Sender<Arc<Node>>, Receiver<Arc<Node>>) = comm::channel();
     let len = root.matrix.len();
     for id in range(0, TASK_NUM) {
         let task_tx = tx.clone();
-        let new = root.deref().clone();
+        let new = root.clone();
         spawn(proc() {
             let mut solutions = Vec::with_capacity(len/2);
-            let mut open: Vec<Rc<Node>> = Vec::with_capacity(MAX_LOOP * 3);
+            let mut open: Vec<Arc<Node>> = Vec::with_capacity(MAX_LOOP * 3);
             let mut close = HashSet::with_capacity(MAX_LOOP * 3);
             for i in range(0, len) {
                 if i % TASK_NUM != id {continue}
-                let mut now = new.clone();
+                let mut now = new.deref().clone();
                 now.center = i as N;
-                now.steps.push(Select);
+                now.step = Select;
                 solutions.push(
                     solve_with_node(
-                        now,
+                        Arc::new(now),
                         &mut open,
                         &mut close
                     )
@@ -207,20 +237,22 @@ fn solve_loop(root: Rc<Node>) -> Rc<Node>
     }
     pre_solutions.sort_by(|a, b| b.value.cmp(&a.value));
     match pre_solutions.pop() {
-        Some(solution) => Rc::new(solution),
+        Some(solution) => solution,
         _ => fail!("error in solve_loop return.")
     }
 }
 
 
-fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Rc<Node>
+fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
 {
-    let mut root = Rc::new(Node {
+    let mut root = Arc::new(Node {
         value: valuation(&matrix, shape),
         matrix: matrix,
         shape: shape,
         center: 0,
-        steps: vec!(Start),
+        depth: 0,
+        step: Start,
+        parent: None,
     }); // init
     for i in range(0, select_num) {
         root = solve_loop(root);
@@ -239,5 +271,7 @@ fn main()
         let m = matrix.as_mut_slice();
         task_rng().shuffle(m);
     }
-    solve(matrix, (X, Y), 16).print();
+    let solution = solve(matrix, (X, Y), 16);
+    solution.print();
+    solution.print_steps();
 }
