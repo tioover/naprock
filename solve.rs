@@ -6,15 +6,15 @@ use std::comm;
 
 type M = u8;
 type N = int;
-type Matrix = Vec<M>;
+type Matrix = Arc<Vec<M>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 16;
-static Y: N = 16;
-static MAX_LOOP: uint = 10000u;
-static TASK_NUM: uint = 8;
-static BASE: uint = 500;
-static THRESHOLD: uint = 200;
+static X: N = 10;
+static Y: N = 10;
+static MAX_LOOP: uint = 100000u;
+static TASK_NUM: uint = 6;
+static BASE: uint = 1000;
+static THRESHOLD: uint = 2000;
 
 
 #[deriving(Clone)]
@@ -55,29 +55,29 @@ impl Node
                  self.value, self.center, (self.center / y + 1, self.center % y + 1), self.depth);
     }
 
-    fn print_step(&self)
-    {
-        match self.step {
-            Up => println!("UP"),
-            Down => println!("DOWN"),
-            Left => println!("LEFT"),
-            Right => println!("RIGHT"),
-            Select => println!("Select {}", self.center),
-            Start => ()
-        }
-    }
-
-    fn print_steps(&self)
-    {
-        self.print_step();
-        let mut now = self.parent.clone();
-        loop {
-            match now {
-                None => break,
-                Some(node) => {node.print_step(); now = node.parent.clone();}
-            }
-        }
-    }
+//    fn print_step(&self)
+//    {
+//        match self.step {
+//            Up => println!("UP"),
+//            Down => println!("DOWN"),
+//            Left => println!("LEFT"),
+//            Right => println!("RIGHT"),
+//            Select => println!("Select {}", self.center),
+//            Start => ()
+//        }
+//    }
+//
+//    fn print_steps(&self)
+//    {
+//        self.print_step();
+//        let mut now = self.parent.clone();
+//        loop {
+//            match now {
+//                None => break,
+//                Some(node) => {node.print_step(); now = node.parent.clone();}
+//            }
+//        }
+//    }
 }
 
 fn valuation(matrix: &Matrix, shape: Shape) -> Value
@@ -87,7 +87,7 @@ fn valuation(matrix: &Matrix, shape: Shape) -> Value
     let (x, y) = shape;
     for i in range(0, x*y) {
         let a = *matrix.get(i as uint) as int;
-        if a == i {block += 1}
+        if a != i {block += 1}
         value += abs(i/y - a/y) + abs((i % y) - (a % y));
     }
     value * 1000 + block
@@ -99,7 +99,7 @@ fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
     let (x, y) = shape;
     let max = x*y;
     let center = parent.center;
-    let mut matrix = parent.matrix.clone();
+    let mut matrix = parent.matrix.deref().clone();
     let shift = match step {
         Up => if center >= y {Some(center - y)} else {None},
         Down => if center < max - y {Some(center + y)} else {None},
@@ -114,6 +114,7 @@ fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
                 let matrix_slice = matrix.as_mut_slice();
                 matrix_slice.swap(center as uint, shift as uint);
             }
+            let matrix = Arc::new(matrix);
             Some(Arc::new(
                 Node {
                     value: valuation(&matrix, parent.shape),
@@ -185,8 +186,8 @@ fn solve_with_node(
             Some(node) => {
                 let value = node.value;
                 if value == 0 {return node;}
-                else if close.contains(&node.matrix) {continue;}
-                else {close.insert(node.matrix.clone());}
+                else if close.contains(node.matrix.deref()) {continue;}
+                else {close.insert(node.matrix.deref().clone());}
                 if is_update(&solution, &node) {
                     solution = node.clone();
                     update = i;
@@ -201,7 +202,8 @@ fn solve_with_node(
 fn solve_loop(root: Arc<Node>) -> Arc<Node>
 {
     let (tx, rx): (Sender<Arc<Node>>, Receiver<Arc<Node>>) = comm::channel();
-    let len = root.matrix.len();
+    let (x, y) = root.shape;
+    let len = (x*y) as uint;
     for id in range(0, TASK_NUM) {
         let task_tx = tx.clone();
         let new = root.clone();
@@ -271,7 +273,7 @@ fn main()
         let m = matrix.as_mut_slice();
         task_rng().shuffle(m);
     }
-    let solution = solve(matrix, (X, Y), 16);
+    let solution = solve(Arc::new(matrix), (X, Y), 16);
     solution.print();
-    solution.print_steps();
+    //solution.print_steps();
 }
