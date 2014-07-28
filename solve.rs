@@ -45,8 +45,8 @@ impl Node
 {
     fn print(&self)
     {
-        let matrix = self.matrix.as_slice();
         let (x, y) = self.shape;
+        let matrix = self.matrix.as_slice();
         for i in range(0, x as uint) {
             let j = y as uint;
             println!("{}", matrix.slice(i*j, i*j+j));
@@ -54,30 +54,6 @@ impl Node
         println!("value: {} center: [{}] {} step: {}\n",
                  self.value, self.center, (self.center / y + 1, self.center % y + 1), self.depth);
     }
-
-//    fn print_step(&self)
-//    {
-//        match self.step {
-//            Up => println!("UP"),
-//            Down => println!("DOWN"),
-//            Left => println!("LEFT"),
-//            Right => println!("RIGHT"),
-//            Select => println!("Select {}", self.center),
-//            Start => ()
-//        }
-//    }
-//
-//    fn print_steps(&self)
-//    {
-//        self.print_step();
-//        let mut now = self.parent.clone();
-//        loop {
-//            match now {
-//                None => break,
-//                Some(node) => {node.print_step(); now = node.parent.clone();}
-//            }
-//        }
-//    }
 }
 
 fn valuation(matrix: &Matrix, shape: Shape) -> Value
@@ -275,5 +251,4 @@ fn main()
     }
     let solution = solve(Arc::new(matrix), (X, Y), 16);
     solution.print();
-    //solution.print_steps();
 }
