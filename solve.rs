@@ -191,6 +191,7 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
                 if i % TASK_NUM != id {continue}
                 let mut now = new.deref().clone();
                 now.center = i as N;
+                now.parent = Some(new.clone());
                 now.step = Select;
                 solutions.push(
                     solve_with_node(
