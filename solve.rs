@@ -9,11 +9,11 @@ type N = int;
 type Matrix = Arc<Vec<M>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 10;
-static Y: N = 10;
+static X: N = 8;
+static Y: N = 8;
 static MAX_LOOP: uint = 100000u;
 static TASK_NUM: uint = 6;
-static BASE: uint = 1000;
+static BASE: uint = 4000;
 static THRESHOLD: uint = 2000;
 
 
@@ -36,6 +36,7 @@ struct Node
     center: N,
     value: Value,
     parent: Option<Arc<Node>>,
+    swap: Option<(N, N)>,
     step: Step,
     depth: uint,
 }
@@ -87,6 +88,18 @@ fn get_shift(step: Step, shape: Shape, center: N) -> Option<N> {
     }
 }
 
+
+fn local_valuation(parent: &Arc<Node>, shift: N) -> Value {
+    let old_value = parent.value;
+    let matrix = parent.matrix.as_slice();
+    let c = parent.center as uint;
+    let s = shift as uint;
+    let shape = parent.shape;
+    let old = point_value(c, matrix[c], shape) + point_value(s, matrix[s], shape);
+    let new = point_value(s, matrix[c], shape) + point_value(c, matrix[s], shape);
+    old_value - old + new
+}
+
 fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
 {
     let shape = parent.shape;
@@ -94,25 +107,19 @@ fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
     match get_shift(step, shape, center) {
         None => None,
         Some(shift) => {
-            let mut matrix = parent.matrix.deref().clone();
-            {
-                let matrix_slice = matrix.as_mut_slice();
-                matrix_slice.swap(center as uint, shift as uint);
-            }
-            let matrix = Arc::new(matrix);
-            Some(
-                Arc::new(
-                    Node {
-                        value: valuation(&matrix, parent.shape),
-                        matrix: matrix,
-                        shape: shape,
-                        parent: Some(parent.clone()),
-                        center: shift,
-                        step: step,
-                        depth: parent.depth + 1,
-                    }
-                )
-            )
+            let node = Arc::new(
+                Node {
+                    value: local_valuation(&parent, shift),
+                    matrix: parent.matrix.clone(),
+                    shape: shape,
+                    parent: Some(parent.clone()),
+                    center: shift,
+                    step: step,
+                    depth: parent.depth + 1,
+                    swap: Some((center, shift)),
+                }
+            );
+            Some(node)
         }
     }
 }
@@ -157,6 +164,23 @@ fn is_update(raw: &Arc<Node>, new: &Arc<Node>) -> bool {
 }
 
 
+fn align(node: Arc<Node>) -> Arc<Node>{
+    match node.swap {
+        None => node,
+        Some((a, b)) => {
+            let mut matrix = node.matrix.deref().clone();
+            {
+                let matrix_slice = matrix.as_mut_slice();
+                matrix_slice.swap(a as uint, b as uint);
+            }
+            let mut node = node.deref().clone();
+            node.matrix = Arc::new(matrix);
+            node.swap = None;
+            Arc::new(node)
+        }
+    }
+}
+
 fn solve_with_node(
         root: Arc<Node>,
         open: &mut Vec<Arc<Node>>,
@@ -170,7 +194,8 @@ fn solve_with_node(
         if i > BASE && i - update > THRESHOLD {break;}
         match open.pop() {
             None => {println!("ERROR: Open empty."); break},
-            Some(node) => {
+            Some(node_) => {
+                let node = align(node_);
                 let value = node.value;
                 if value == 0 {return node;}
                 else if close.contains(node.matrix.deref()) {continue;}
@@ -204,6 +229,7 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
                 now.center = i as N;
                 now.parent = Some(new.clone());
                 now.step = Select;
+                now.depth += 1;
                 solutions.push(
                     solve_with_node(
                         Arc::new(now),
@@ -243,6 +269,7 @@ fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
         depth: 0,
         step: Start,
         parent: None,
+        swap: None,
     }); // init
     for i in range(0, select_num) {
         root = solve_loop(root);
