@@ -56,52 +56,63 @@ impl Node
     }
 }
 
+
+fn point_value(index: uint, value: u8, shape: Shape) -> int {
+    let i = index as int;
+    let v = value as int;
+    let (_, b) = shape;
+    let y = b as int;
+    abs(i/y - v/y) + abs((i % y) - (v % y))
+}
+
+
 fn valuation(matrix: &Matrix, shape: Shape) -> Value
 {
     let mut value: Value = 0;
-    let mut block = 0;
-    let (x, y) = shape;
-    for i in range(0, x*y) {
-        let a = *matrix.get(i as uint) as int;
-        if a != i {block += 1}
-        value += abs(i/y - a/y) + abs((i % y) - (a % y));
+    for i in range(0, matrix.len()) {
+        value += point_value(i, *matrix.get(i), shape)
     }
-    value * 1000 + block
+    value
+}
+
+
+fn get_shift(step: Step, shape: Shape, center: N) -> Option<N> {
+    let (x, y) = shape;
+    match step {
+        Up => if center >= y {Some(center - y)} else {None},
+        Down => if center < x*y - y {Some(center + y)} else {None},
+        Left => if center % y != 0 {Some(center - 1)} else {None},
+        Right => if (center + 1) % y != 0 {Some(center + 1)} else {None},
+        _ => fail!("turn arg error")
+    }
 }
 
 fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
 {
     let shape = parent.shape;
-    let (x, y) = shape;
-    let max = x*y;
     let center = parent.center;
-    let mut matrix = parent.matrix.deref().clone();
-    let shift = match step {
-        Up => if center >= y {Some(center - y)} else {None},
-        Down => if center < max - y {Some(center + y)} else {None},
-        Left => if center % y != 0 {Some(center - 1)} else {None},
-        Right => if (center + 1) % y != 0 {Some(center + 1)} else {None},
-        _ => fail!("turn arg error")
-    };
-    match shift {
+    match get_shift(step, shape, center) {
         None => None,
         Some(shift) => {
+            let mut matrix = parent.matrix.deref().clone();
             {
                 let matrix_slice = matrix.as_mut_slice();
                 matrix_slice.swap(center as uint, shift as uint);
             }
             let matrix = Arc::new(matrix);
-            Some(Arc::new(
-                Node {
-                    value: valuation(&matrix, parent.shape),
-                    matrix: matrix,
-                    shape: shape,
-                    parent: Some(parent.clone()),
-                    center: shift,
-                    step: step,
-                    depth: parent.depth + 1,
-                }
-            ))
+            Some(
+                Arc::new(
+                    Node {
+                        value: valuation(&matrix, parent.shape),
+                        matrix: matrix,
+                        shape: shape,
+                        parent: Some(parent.clone()),
+                        center: shift,
+                        step: step,
+                        depth: parent.depth + 1,
+                    }
+                )
+            )
         }
     }
 }
