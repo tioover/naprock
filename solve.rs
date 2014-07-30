@@ -9,12 +9,12 @@ type N = int;
 type Matrix = Arc<Vec<M>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 8;
-static Y: N = 8;
-static MAX_LOOP: uint = 100000u;
-static TASK_NUM: uint = 6;
-static BASE: uint = 4000;
-static THRESHOLD: uint = 2000;
+static X: N = 16;  // 矩阵行数
+static Y: N = 16;  // 矩阵列数
+static MAX_LOOP: uint = 100000u;  // 最大循环 基本不可能达到
+static TASK_NUM: uint = 6;  // 进程数，设为 1 为单进程
+static BASE: uint = 1000;  // 最小循环数
+static THRESHOLD: uint = 2000;  // 循环阈值
 
 
 #[deriving(Clone)]
@@ -36,7 +36,7 @@ struct Node
     center: N,
     value: Value,
     parent: Option<Arc<Node>>,
-    swap: Option<(N, N)>,
+    delay: Option<(N, N)>,
     step: Step,
     depth: uint,
 }
@@ -116,7 +116,7 @@ fn turn(parent: Arc<Node>, step: Step) -> Option<Arc<Node>>
                     center: shift,
                     step: step,
                     depth: parent.depth + 1,
-                    swap: Some((center, shift)),
+                    delay: Some((center, shift)),
                 }
             );
             Some(node)
@@ -164,8 +164,8 @@ fn is_update(raw: &Arc<Node>, new: &Arc<Node>) -> bool {
 }
 
 
-fn align(node: Arc<Node>) -> Arc<Node>{
-    match node.swap {
+fn force(node: Arc<Node>) -> Arc<Node>{
+    match node.delay {
         None => node,
         Some((a, b)) => {
             let mut matrix = node.matrix.deref().clone();
@@ -175,7 +175,7 @@ fn align(node: Arc<Node>) -> Arc<Node>{
             }
             let mut node = node.deref().clone();
             node.matrix = Arc::new(matrix);
-            node.swap = None;
+            node.delay = None;
             Arc::new(node)
         }
     }
@@ -194,8 +194,8 @@ fn solve_with_node(
         if i > BASE && i - update > THRESHOLD {break;}
         match open.pop() {
             None => {println!("ERROR: Open empty."); break},
-            Some(node_) => {
-                let node = align(node_);
+            Some(delay_node) => {
+                let node = force(delay_node);
                 let value = node.value;
                 if value == 0 {return node;}
                 else if close.contains(node.matrix.deref()) {continue;}
@@ -269,7 +269,7 @@ fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
         depth: 0,
         step: Start,
         parent: None,
-        swap: None,
+        delay: None,
     }); // init
     for i in range(0, select_num) {
         root = solve_loop(root);
