@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::num::abs;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::rand::{task_rng, Rng};
 use std::comm;
 
@@ -9,9 +9,9 @@ type N = int;
 type Matrix = Arc<Vec<M>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 16;  // 矩阵行数
-static Y: N = 16;  // 矩阵列数
-static MAX_LOOP: uint = 100000u;  // 最大循环 基本不可能达到
+static X: N = 8;  // 矩阵行数
+static Y: N = 8;  // 矩阵列数
+static MAX_LOOP: uint = 100000;  // 最大循环 基本不可能达到
 static TASK_NUM: uint = 6;  // 进程数，设为 1 为单进程
 static BASE: uint = 1000;  // 最小循环数
 static THRESHOLD: uint = 2000;  // 循环阈值
@@ -181,10 +181,11 @@ fn force(node: Arc<Node>) -> Arc<Node>{
     }
 }
 
+
 fn solve_with_node(
         root: Arc<Node>,
         open: &mut Vec<Arc<Node>>,
-        close: &mut HashSet<Vec<u8>>
+        close: &mut HashMap<Vec<u8>, Arc<Node>>
     ) -> Arc<Node>
 {
     let mut update = 0;
@@ -198,8 +199,13 @@ fn solve_with_node(
                 let node = force(delay_node);
                 let value = node.value;
                 if value == 0 {return node;}
-                else if close.contains(node.matrix.deref()) {continue;}
-                else {close.insert(node.matrix.deref().clone());}
+                match close.find(node.matrix.deref()) {
+                    Some(old_node) => {
+                        continue;
+                    },
+                    None => (),
+                }
+                close.insert(node.matrix.deref().clone(), node.clone());
                 if is_update(&solution, &node) {
                     solution = node.clone();
                     update = i;
@@ -216,13 +222,19 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
     let (tx, rx): (Sender<Arc<Node>>, Receiver<Arc<Node>>) = comm::channel();
     let (x, y) = root.shape;
     let len = (x*y) as uint;
+    fn cmp(b: &Arc<Node>, a: &Arc<Node>) -> Ordering {
+        match a.value.cmp(&b.value) {
+            Equal => b.depth.cmp(&a.depth),
+            x => x,
+        }
+    };
     for id in range(0, TASK_NUM) {
         let task_tx = tx.clone();
         let new = root.clone();
         spawn(proc() {
             let mut solutions = Vec::with_capacity(len/2);
             let mut open: Vec<Arc<Node>> = Vec::with_capacity(MAX_LOOP * 3);
-            let mut close = HashSet::with_capacity(MAX_LOOP * 3);
+            let mut close = HashMap::with_capacity(MAX_LOOP * 3);
             for i in range(0, len) {
                 if i % TASK_NUM != id {continue}
                 let mut now = new.deref().clone();
@@ -240,7 +252,7 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
                 open.clear();
                 close.clear();
             }
-            solutions.sort_by(|a, b| b.value.cmp(&a.value));
+            solutions.sort_by(cmp);
             match solutions.pop() {
                 None => fail!("error in thread return"),
                 Some(solution) => task_tx.send(solution),
@@ -251,7 +263,7 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
     for _ in range(0, TASK_NUM) {
         pre_solutions.push(rx.recv());
     }
-    pre_solutions.sort_by(|a, b| b.value.cmp(&a.value));
+    pre_solutions.sort_by(cmp);
     match pre_solutions.pop() {
         Some(solution) => solution,
         _ => fail!("error in solve_loop return.")
@@ -274,7 +286,7 @@ fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
     for i in range(0, select_num) {
         root = solve_loop(root);
         if root.value == 0 {break;}
-        println!("{}", i);
+        println!("=========={}", i);
         root.print();
     }
     root
