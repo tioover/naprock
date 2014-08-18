@@ -3,10 +3,15 @@ import matplotlib.image as mpimg
 # import matplotlib.pyplot as plt
 
 
-norm = np.linalg.norm
+def rgb2gray(rgb):
+    return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+
+
 img = mpimg.imread("problem.png")
+img = rgb2gray(img)
+norm = np.linalg.norm
 shape = (16, 16)
-height, width, _ = img.shape
+height, width = img.shape
 height, width = (height/16, width/16)
 
 
@@ -24,20 +29,16 @@ def down(m):
     return blocks
 
 
-def compare(o, p) -> float:
-    o = o[1: -1]
-    q = p[0: -2]
-    r = p[1: -1]
-    s = p[2:]
-
-    x = map(norm, o - q)
-    y = map(norm, o - r)
-    z = map(norm, o - s)
-    return sum((min(*l) for l in zip(x, y, z)))
-
-
 def compare_line(a, b) -> float:
-    return compare(a, b) + compare(b, a)
+    a = a[1: -1]
+    p = b[0: -2]
+    q = b[1: -1]
+    r = b[2:]
+
+    x = np.fabs(a - p)
+    y = np.fabs(a - q)
+    z = np.fabs(a - r)
+    return sum((min(*li) for li in zip(x, y, z)))
 
 
 def top(a, b):
@@ -68,8 +69,10 @@ def find(f, base, blocks):
     return min_index
 
 
+_blocks = down(img)
+
 
 def test(i):
-    blocks = down(img)
+    blocks = _blocks[:]
     block = blocks[i]
     return block, blocks[find(top, block, blocks)]
