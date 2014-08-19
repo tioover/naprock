@@ -38,6 +38,7 @@ def compare_line(a, b) -> float:
     x = np.fabs(a - p)
     y = np.fabs(a - q)
     z = np.fabs(a - r)
+
     return sum((min(*li) for li in zip(x, y, z)))
 
 
@@ -66,7 +67,7 @@ def find(f, base, blocks):
         if value < min_value:
             min_value = value
             min_index = i
-    return min_index
+    return min_index, min_value
 
 
 _blocks = down(img)
@@ -75,4 +76,5 @@ _blocks = down(img)
 def test(i):
     blocks = _blocks[:]
     block = blocks[i]
-    return block, blocks[find(top, block, blocks)]
+    find_index, find_value = find(top, block, blocks)
+    return block, blocks[find_index], find_value

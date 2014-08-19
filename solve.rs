@@ -9,10 +9,10 @@ type N = int;
 type Matrix = Arc<Vec<M>>;
 type Shape = (N, N);
 type Value = int;
-static X: N = 8;  // 矩阵行数
-static Y: N = 8;  // 矩阵列数
+static X: N = 10;  // 矩阵行数
+static Y: N = 10;  // 矩阵列数
 static MAX_LOOP: uint = 100000;  // 最大循环 基本不可能达到
-static TASK_NUM: uint = 6;  // 进程数，设为 1 为单进程
+static TASK_NUM: uint = 16;  // 进程数，设为 1 为单进程
 static BASE: uint = 1000;  // 最小循环数
 static THRESHOLD: uint = 2000;  // 循环阈值
 
@@ -300,6 +300,8 @@ fn main()
         let m = matrix.as_mut_slice();
         task_rng().shuffle(m);
     }
+    println!("test 0");
     let solution = solve(Arc::new(matrix), (X, Y), 16);
     solution.print();
+    println!("test 1");
 }
