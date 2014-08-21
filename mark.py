@@ -90,148 +90,102 @@ class Block:
     def left_top(self):
         if self.left:
             return self.left.top
-        elif self.top:
+
+    @property
+    def top_left(self):
+        if self.top:
             return self.top.left
 
     @property
     def left_bottom(self):
         if self.left:
             return self.left.bottom
-        elif self.bottom:
+
+    @property
+    def bottom_left(self):
+        if self.bottom:
             return self.bottom.left
 
     @property
     def right_top(self):
         if self.right:
             return self.right.top
-        elif self.top:
+
+    @property
+    def top_right(self):
+        if self.top:
             return self.top.right
 
     @property
     def right_bottom(self):
         if self.right:
             return self.right.bottom
-        elif self.bottom:
+
+    @property
+    def bottom_right(self):
+        if self.bottom:
             return self.bottom.right
 
 
-def search(threshold=0.5):
+def search():
     blocks = list(map(Block, slices))
-    find_blocks = blocks.copy()
     for block in blocks:
-        find_index, find_value = find(right, block, find_blocks)
-        if find_value <= threshold:
-            block.right = find_blocks.pop(find_index)
-            block.right.left = block
-    for block in blocks:
-        find_index, find_value = find(top, block, find_blocks)
-        if find_value <= threshold:
-            block.top = find_blocks.pop(find_index)
-            block.top.bottom = block
-    for block in blocks:
-        find_index, find_value = find(bottom, block, find_blocks)
-        if find_value <= threshold:
-            block.bottom = find_blocks.pop(find_index)
-            block.bottom.top = block
-    for block in blocks:
-        find_index, find_value = find(left, block, find_blocks)
-        if find_value <= threshold:
-            block.left = find_blocks.pop(find_index)
-            block.left.right = block
-    for block in blocks:
-        if not block.top:
-            if block.right_top:
-                i, _ = find(left, block.right_top, find_blocks)
-                j, _ = find(top, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.right_top.left = b
-                    block.top = b
-            elif block.left_top:
-                i, _ = find(left, block.left_top, find_blocks)
-                j, _ = find(top, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.left_top.right = b
-                    block.top = b
-        if not block.right:
-            if block.right_top:
-                i, _ = find(bottom, block.right_top, find_blocks)
-                j, _ = find(right, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.right_top.bottom = b
-                    block.right = b
-            elif block.right_bottom:
-                i, _ = find(top, block.right_bottom, find_blocks)
-                j, _ = find(right, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.right_bottom.top = b
-                    block.right = b
-        if not block.bottom:
-            if block.right_bottom:
-                i, _ = find(left, block.right_bottom, find_blocks)
-                j, _ = find(bottom, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.right_bottom.left = b
-                    block.bottom = b
-            elif block.left_bottom:
-                i, _ = find(right, block.left_bottom, find_blocks)
-                j, _ = find(bottom, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.left_bottom.right = b
-                    block.bottom = b
-        if not block.left:
-            if block.left_top:
-                i, _ = find(bottom, block.left_top, find_blocks)
-                j, _ = find(left, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.left_top.bottom = b
-                    block.left = b
-            elif block.left_bottom:
-                i, _ = find(top, block.left_bottom, find_blocks)
-                j, _ = find(left, block, find_blocks)
-                if i == j:
-                    b = find_blocks[i]
-                    block.left_bottom.top = b
-                    block.left = b
-
-    find_blocks = blocks.copy()
-    for block in blocks:
+        if block.right:
+            right_block = block.right
+        else:
+            right_index, _ = find(right, block, blocks)
+            right_block = blocks[right_index]
         if block.top:
-            continue
-        find_index, find_value = find(top, block, find_blocks)
-        if find_value <= threshold:
-            block.top = find_blocks.pop(find_index)
-            block.top.bottom = block
+            top_block = block.top
+        else:
+            top_index, _ = find(top, block, blocks)
+            top_block = blocks[top_index]
+        if top_block.right:
+            top_right_block = top_block.right
+        else:
+            top_right_index, _ = find(right, top_block, blocks)
+            top_right_block = blocks[top_right_index]
+        if top_right_block.bottom:
+            top_right_bottom_block = top_right_block.bottom
+        else:
+            top_right_bottom_index, _ = find(bottom, top_right_block, blocks)
+            top_right_bottom_block = blocks[top_right_bottom_index]
+        if top_right_bottom_block is right_block:
+            block.right = right_block
+            right_block.left = block
+            block.top = top_block
+            top_block.bottom = block
+            top_block.right = top_right_block
+            top_right_block.left = top_block
+            top_right_block.bottom = right_block
+            right_block.up = top_right_block
+
+
 
     img_height, img_width = img.shape
     new_list = []
     close = set()
-    for i in range(len(blocks)):
-        i = len(blocks) - i - 1
-        if blocks[i] in close:
+    for block in blocks:
+        if block in close:
             continue
-        new = np.ndarray((img_height*2, img_width*2), dtype=img.dtype)
-        open = [(blocks[i], (img_height, img_width))]
-        while open:
-            block, shift = open.pop()
+        a, b = img_height*2, img_width*2
+        new = np.ndarray((a, b), dtype=img.dtype)
+        open_table = [(block, (a//2, b//2))]
+        while open_table:
+            block, shift = open_table.pop()
             if block in close:
                 continue
+            else:
+                close.add(block)
             a, b = shift
             new[a: a+height, b: b+width] = block.m
-            close.add(block)
             if block.top:
-                open.append((block.top, (a-height, b)))
+                open_table.append((block.top, (a-height, b)))
             if block.right:
-                open.append((block.right, (a, b+width)))
+                open_table.append((block.right, (a, b+width)))
             if block.bottom:
-                open.append((block.bottom, (a+height, b)))
+                open_table.append((block.bottom, (a+height, b)))
             if block.left:
-                open.append((block.left, (a, b-width)))
+                open_table.append((block.left, (a, b-width)))
         new_list.append(new)
     return new_list
