@@ -198,6 +198,7 @@ def search():
         if block in close:
             continue
         a, b = img_height*2, img_width*2
+        a_min, a_max, b_min, b_max = a, 0, b, 0
         new = np.ndarray((a, b), dtype=img.dtype)
         open_table = [(block, (a//2, b//2))]
         while open_table:
@@ -207,7 +208,13 @@ def search():
             else:
                 close.add(block)
             a, b = shift
-            new[a: a+height, b: b+width] = block.m
+            ah, bw = a+height, b+width
+            new[a: ah, b: bw] = block.m
+            # update show range.
+            a_min = a if a < a_min else a_min
+            a_max = ah if ah > a_max else a_max
+            b_min = b if b < b_min else b_min
+            b_max = bw if bw > b_max else b_max
             if block.top:
                 open_table.append((block.top, (a-height, b)))
             if block.right:
@@ -216,5 +223,5 @@ def search():
                 open_table.append((block.bottom, (a+height, b)))
             if block.left:
                 open_table.append((block.left, (a, b-width)))
-        new_list.append(new)
+        new_list.append(new[a_min: a_max, b_min: b_max])
     return new_list
