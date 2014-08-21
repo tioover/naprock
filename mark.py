@@ -160,7 +160,36 @@ def search():
             top_right_block.bottom = right_block
             right_block.up = top_right_block
 
-
+    # for block in blocks:
+    #     if block.left:
+    #         left_block = block.left
+    #     else:
+    #         left_index, _ = find(left, block, blocks)
+    #         left_block = blocks[left_index]
+    #     if block.bottom:
+    #         bottom_block = block.bottom
+    #     else:
+    #         bottom_index, _ = find(bottom, block, blocks)
+    #         bottom_block = blocks[bottom_index]
+    #     if bottom_block.left:
+    #         bottom_left_block = bottom_block.left
+    #     else:
+    #         bottom_left_index, _ = find(left, bottom_block, blocks)
+    #         bottom_left_block = blocks[bottom_left_index]
+    #     if bottom_left_block.top:
+    #         bottom_left_top_block = bottom_left_block.top
+    #     else:
+    #         bottom_left_top_index, _ = find(top, bottom_left_block, blocks)
+    #         bottom_left_top_block = blocks[bottom_left_top_index]
+    #     if bottom_left_top_block is left_block:
+    #         block.left = left_block
+    #         left_block.right = block
+    #         block.bottom = bottom_block
+    #         bottom_block.top = block
+    #         bottom_block.left = bottom_left_block
+    #         bottom_left_block.right = bottom_block
+    #         bottom_left_block.up = left_block
+    #         left_block.down = bottom_left_block
 
     img_height, img_width = img.shape
     new_list = []
