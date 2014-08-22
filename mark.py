@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.image as mpimg
-# import matplotlib.pyplot as plt
 
 
 def get_img(filename):
@@ -29,15 +28,10 @@ def down(img, shape):
 
 def compare_line(a, b) -> float:
     a = a[1: -1]
-    p = b[0: -2]
-    q = b[1: -1]
-    r = b[2:]
-
-    x = np.fabs(a - p)
-    y = np.fabs(a - q)
-    z = np.fabs(a - r)
-
-    return sum((min(*li) for li in zip(x, y, z)))
+    return np.sum(np.minimum(np.minimum(
+        np.fabs(a - b[0: -2]),
+        np.fabs(a - b[1: -1])),
+        np.fabs(a - b[2:])))
 
 
 def top(a, b):
@@ -177,7 +171,7 @@ def auxiliary_mark(blocks: set, threshold):
                         found.bottom = block
 
 
-def piece_together(slices: list, threshold, aux):
+def piece_together(slices: list, aux, threshold):
     blocks = set(map(Block, slices))
     basic_mark(blocks)
     if aux:
@@ -226,8 +220,8 @@ def make_img(img, shape, blocks):
     return new_list
 
 
-def main(filename="problem.png", shape=(16, 16), threshold=1, aux=True):
+def main(filename="problem.png", shape=(16, 16), aux=True, threshold=1):
     img = get_img(filename)
     slices = down(img, shape)
-    blocks = piece_together(slices, threshold, aux)
+    blocks = piece_together(slices, aux, threshold)
     return make_img(img, shape, blocks)
