@@ -177,16 +177,17 @@ def auxiliary_mark(blocks: set, threshold):
                     block.right = found
                     found.left = block
                 else:
-                    found, v = find(top, block, ma)
+                    found, v = find(top, block, marked)
                     if v < threshold:
                         block.top = found
                         found.bottom = block
 
 
-def search(threshold=2):
+def search(threshold=2, aux=True):
     blocks = set(map(Block, slices))
     basic_mark(blocks)
-    auxiliary_mark(blocks, threshold)
+    if aux:
+        auxiliary_mark(blocks, threshold)
 
     new_list = []
     close = set()
@@ -195,7 +196,7 @@ def search(threshold=2):
             continue
         a, b = img_height*2, img_width*2
         a_min, a_max, b_min, b_max = a, 0, b, 0
-        new = np.ndarray((a, b), dtype=img.dtype)
+        new = np.ndarray((a, b))
         open_table = [(block, (a//2, b//2))]
         while open_table:
             block, shift = open_table.pop()
