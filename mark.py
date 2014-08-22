@@ -3,30 +3,27 @@ import matplotlib.image as mpimg
 # import matplotlib.pyplot as plt
 
 
-def rgb2gray(rgb):
-    return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+def get_img(filename):
+    rgb2gray = lambda rgb: np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+    img = mpimg.imread(filename)
+    img = rgb2gray(img)
+    return img
 
 
-img = mpimg.imread("problem.png")
-img = rgb2gray(img)
-norm = np.linalg.norm
-shape = (16, 16)
-shape_a, shape_b = shape
-img_height, img_width = img.shape
-block_height, block_width = (img_height/shape_a, img_width/shape_b)
-
-
-def split(m, index):
+def split(img, shape, index):
+    shape_a, shape_b = shape
+    img_height, img_width = img.shape
+    block_height, block_width = (img_height/shape_a, img_width/shape_b)
     a, b = index
-    return m[a*block_height: (a+1)*block_height, b*block_width: (b+1)*block_width]
+    return img[a*block_height: (a+1)*block_height, b*block_width: (b+1)*block_width]
 
 
-def down(m):
+def down(img, shape):
     blocks = []
     a, b = shape
     for i in range(a):
         for j in range(b):
-            blocks.append(split(m, (i, j)))
+            blocks.append(split(img, shape, (i, j)))
     return blocks
 
 
@@ -68,9 +65,6 @@ def find(f, base, blocks):
             min_value = value
             min_block = block
     return min_block, min_value
-
-
-slices = down(img)
 
 
 class Block:
@@ -183,12 +177,18 @@ def auxiliary_mark(blocks: set, threshold):
                         found.bottom = block
 
 
-def search(threshold=2, aux=True):
+def piece_together(slices: list, threshold, aux):
     blocks = set(map(Block, slices))
     basic_mark(blocks)
     if aux:
         auxiliary_mark(blocks, threshold)
+    return blocks
 
+
+def make_img(img, shape, blocks):
+    img_height, img_width = img.shape
+    shape_a, shape_b = shape
+    block_height, block_width = (img_height/shape_a, img_width/shape_b)
     new_list = []
     close = set()
     for block in blocks:
@@ -224,3 +224,10 @@ def search(threshold=2, aux=True):
                 open_table.append((block.left, (a, b-block_width)))
         new_list.append(new[a_min: a_max, b_min: b_max])
     return new_list
+
+
+def main(filename="problem.png", shape=(16, 16), threshold=1, aux=True):
+    img = get_img(filename)
+    slices = down(img, shape)
+    blocks = piece_together(slices, threshold, aux)
+    return make_img(img, shape, blocks)
