@@ -11,7 +11,10 @@ def get_img(filename):
 
 def split(img, shape, index):
     shape_a, shape_b = shape
-    img_height, img_width = img.shape
+    if len(img.shape) == 2:
+        img_height, img_width = img.shape
+    else:
+        img_height, img_width, _ = img.shape
     block_height, block_width = (img_height/shape_a, img_width/shape_b)
     a, b = index
     return img[a*block_height: (a+1)*block_height, b*block_width: (b+1)*block_width]
@@ -22,7 +25,8 @@ def down(img, shape):
     a, b = shape
     for i in range(a):
         for j in range(b):
-            blocks.append(split(img, shape, (i, j)))
+            piece = split(img, shape, (i, j))
+            blocks.append(piece)
     return blocks
 
 
@@ -225,3 +229,7 @@ def main(filename="problem.png", shape=(16, 16), aux=True, threshold=1):
     slices = down(img, shape)
     blocks = piece_together(slices, aux, threshold)
     return make_img(img, shape, blocks)
+
+
+if __name__ == '__main__':
+    pass
