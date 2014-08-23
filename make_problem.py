@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 from mark import np, mpimg, down
 from random import shuffle
@@ -24,3 +25,5 @@ for i in range(a):
         piece = lst[i*b+j]
         new[i*m: i*m+m, j*n: j*n+n] = piece
 mpimg.imsave(output_file_name, new, dpi=1)
+t = mpimg.imread(output_file_name)
+print(t.shape, img.shape)
