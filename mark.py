@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 
 
 def get_img(filename):
@@ -14,7 +15,7 @@ def split(img, shape, index):
     if len(img.shape) == 2:
         img_height, img_width = img.shape
     else:
-        img_height, img_width, _ = img.shape
+        img_height, img_width, *_ = img.shape
     block_height, block_width = (img_height/shape_a, img_width/shape_b)
     a, b = index
     return img[a*block_height: (a+1)*block_height, b*block_width: (b+1)*block_width]
@@ -116,38 +117,84 @@ class Block:
             return self.bottom.right
 
 
-def basic_mark(blocks: set):
+def up_right_mark(blocks: set):
     for block in blocks:
-        if block.right:
-            right_block = block.right
-        else:
-            right_block, _ = find(right, block, blocks)
-        if block.top:
-            top_block = block.top
-        else:
-            top_block, _ = find(top, block, blocks)
-        if top_block.right:
-            top_right_block = top_block.right
-        else:
-            top_right_block, _ = find(right, top_block, blocks)
-        if top_right_block.bottom:
-            top_right_bottom_block = top_right_block.bottom
-        else:
-            top_right_bottom_block, _ = find(bottom, top_right_block, blocks)
+        right_block, _ = find(right, block, blocks)
+        top_block, _ = find(top, block, blocks)
+        top_right_block, _ = find(right, top_block, blocks)
+        top_right_bottom_block, _ = find(bottom, top_right_block, blocks)
         if top_right_bottom_block is right_block:
             block.right = right_block
             right_block.left = block
+
             block.top = top_block
             top_block.bottom = block
+
             top_block.right = top_right_block
             top_right_block.left = top_block
+
             top_right_block.bottom = right_block
             right_block.up = top_right_block
+
             block.marked = True
             top_block.marked = True
             top_right_block.marked = True
             top_right_bottom_block.marked = True
             right_block.marked = True
+
+
+def left_bottom_mark(blocks: set):
+    for block in blocks:
+        bottom_block, _ = find(bottom, block, blocks)
+        left_block, _ = find(left, block, blocks)
+        left_bottom_block, _ = find(bottom, left_block, blocks)
+        left_bottom_right_block, _ = find(right, left_bottom_block, blocks)
+        if bottom_block is left_bottom_right_block:
+            block.bottom = bottom_block
+            bottom_block.top = block
+            block.left = left_block
+            left_block.right = block
+            left_block.bottom = left_bottom_block
+            left_bottom_block.top = left_block
+            left_bottom_block.right = bottom_block
+            bottom_block.left = left_bottom_block
+            block.marked = True
+            left_block.marked = True
+            left_bottom_block.marked = True
+            bottom_block.marked = True
+
+
+def loop_mark(blocks: set):
+    for block in blocks:
+        bottom_block, _ = find(bottom, block, blocks)
+        left_block, _ = find(left, block, blocks)
+        left_bottom_block, _ = find(bottom, left_block, blocks)
+        left_bottom_right_block, _ = find(right, left_bottom_block, blocks)
+        if bottom_block is not left_bottom_right_block:
+            return
+
+        bottom_right_block, _ = find(right, bottom_block, blocks)
+        bottom_right_top_block, _ = find(top, bottom_right_block, blocks)
+        bottom_right_top_left_block, _ = find(left, bottom_right_top_block, blocks)
+
+        if bottom_right_top_left_block is block:
+            block.bottom = bottom_block
+            bottom_block.top = block
+            block.left = left_block
+            left_block.right = block
+            left_block.bottom = left_bottom_block
+            left_bottom_block.top = left_block
+            left_bottom_block.right = bottom_block
+            bottom_block.left = left_bottom_block
+            bottom_block.right = bottom_right_block
+            bottom_right_block.left = bottom_block
+            bottom_right_block.top = bottom_right_top_block
+            bottom_right_top_block.bottom = bottom_right_block
+            bottom_right_top_block.left = block
+            block.right = bottom_right_top_block
+            for i in [block, left_bottom_block, left_block, left_bottom_right_block,
+                      bottom_right_block, bottom_block, bottom_right_block, bottom_right_top_block]:
+                i.marked = True
 
 
 def auxiliary_mark(blocks: set, threshold):
@@ -163,23 +210,15 @@ def auxiliary_mark(blocks: set, threshold):
             if v < threshold:
                 block.bottom = found
                 found.top = block
-            else:
-                found, v = find(right, block, marked)
-                if v < threshold:
-                    block.right = found
-                    found.left = block
-                else:
-                    found, v = find(top, block, marked)
-                    if v < threshold:
-                        block.top = found
-                        found.bottom = block
 
 
-def piece_together(slices: list, aux, threshold):
+def piece_together(slices: list, aux, threshold, up_first):
     blocks = set(map(Block, slices))
-    basic_mark(blocks)
+    left_bottom_mark(blocks)
+    loop_mark(blocks)
     if aux:
         auxiliary_mark(blocks, threshold)
+
     return blocks
 
 
@@ -204,7 +243,15 @@ def make_img(img, shape, blocks):
                 close.add(block)
             a, b = shift
             ah, bw = a+block_height, b+block_width
-            new[a: ah, b: bw] = block.m
+            try:
+                new[a: ah, b: bw] = block.m
+            except ValueError as e:
+                print(new.shape)
+                print((a, ah))
+                print((b, bw))
+                print(block.m)
+                print(new[a: ah, b: bw])
+                raise e
 
             # update show range.
             a_min = a if a < a_min else a_min
@@ -224,10 +271,10 @@ def make_img(img, shape, blocks):
     return new_list
 
 
-def main(filename="problem.png", shape=(16, 16), aux=True, threshold=1):
+def main(filename="test.png", shape=(16, 16), aux=True, threshold=1, up_first=True):
     img = get_img(filename)
     slices = down(img, shape)
-    blocks = piece_together(slices, aux, threshold)
+    blocks = piece_together(slices, aux, threshold, up_first)
     return make_img(img, shape, blocks)
 
 
