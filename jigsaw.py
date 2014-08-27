@@ -128,18 +128,21 @@ def mark(blocks):
     id_steps_f = (Right, Bottom, Left, Top)
     id_steps_g = (Bottom, Left, Top, Right)
     id_steps_h = (Left, Bottom, Right, Top)
+    find_blocks = blocks
 
     for block in blocks:
         is_id = lambda trace: trace[-1].y is block
-        trace_a = get_trace(blocks, block, id_steps_a)
-        trace_d = get_trace(blocks, block, id_steps_d)
-        trace_g = get_trace(blocks, block, id_steps_g)
-        trace_e = get_trace(blocks, block, id_steps_e)
+        trace_a = get_trace(find_blocks, block, id_steps_a)
+        trace_d = get_trace(find_blocks, block, id_steps_d)
+        trace_g = get_trace(find_blocks, block, id_steps_g)
+        trace_e = get_trace(find_blocks, block, id_steps_e)
         if is_id(trace_a) and is_id(trace_d) and is_id(trace_g) and is_id(trace_e) and\
                 trace_a[0].y is trace_d[-2].y and trace_d[0].y is trace_g[-2].y and trace_a[-2].y is trace_e[-2].y:
             print("id")
             build_trace(trace_a)
             build_trace(trace_d)
+            build_trace(trace_g)
+            build_trace(trace_e)
 
     return blocks
 
