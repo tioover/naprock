@@ -136,8 +136,10 @@ def mark(blocks):
         trace_d = get_trace(find_blocks, block, id_steps_d)
         trace_g = get_trace(find_blocks, block, id_steps_g)
         trace_e = get_trace(find_blocks, block, id_steps_e)
+        f = lambda trace: trace[0].y
+        g = lambda trace: trace[-2].y
         if is_id(trace_a) and is_id(trace_d) and is_id(trace_g) and is_id(trace_e) and\
-                trace_a[0].y is trace_d[-2].y and trace_d[0].y is trace_g[-2].y and trace_a[-2].y is trace_e[-2].y:
+                f(trace_a) is g(trace_d) and f(trace_d) is g(trace_g) and g(trace_a) is g(trace_e):
             print("id")
             build_trace(trace_a)
             build_trace(trace_d)
@@ -162,7 +164,7 @@ def make_solved_image(img, shape, blocks):
         open_table = [(block, (a//2, b//2))]
         while open_table:
             block, shift = open_table.pop()
-            if block in close:
+            if not block or block in close:
                 continue
             else:
                 close.add(block)
@@ -176,14 +178,10 @@ def make_solved_image(img, shape, blocks):
             b_min = b if b < b_min else b_min
             b_max = bw if bw > b_max else b_max
 
-            if block.top:
-                open_table.append((block.top, (a-block_height, b)))
-            if block.right:
-                open_table.append((block.right, (a, b+block_width)))
-            if block.bottom:
-                open_table.append((block.bottom, (a+block_height, b)))
-            if block.left:
-                open_table.append((block.left, (a, b-block_width)))
+            open_table.append((block.top, (a-block_height, b)))
+            open_table.append((block.right, (a, b+block_width)))
+            open_table.append((block.bottom, (a+block_height, b)))
+            open_table.append((block.left, (a, b-block_width)))
         new_list.append(new[a_min: a_max, b_min: b_max])
     return new_list
 
