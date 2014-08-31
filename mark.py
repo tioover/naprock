@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 
+rgb2gray = lambda rgb: np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
 
 def get_img(filename):
-    rgb2gray = lambda rgb: np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
     img = mpimg.imread(filename)
     img = rgb2gray(img)
     return img
