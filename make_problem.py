@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 
-from jigsaw import np, mpimg, down
+from mark import np, mpimg, split
 from random import shuffle
 
 
@@ -21,7 +21,7 @@ if img_b % b:
 m, n = img_a / a, img_b / b
 
 new = np.ndarray((img_a, img_b, img_c))
-lst = down(img[:img_a, :img_b], shape)
+lst = split(img[:img_a, :img_b], shape)
 shuffle(lst)
 for i in range(a):
     for j in range(b):

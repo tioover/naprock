@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.image as mpimg
 from random import shuffle
 from lib import gray, split
+import matplotlib.cm as cm
 
 
 class Block:
@@ -23,7 +24,9 @@ class Reference:
         if (cls, y) in x.cache:
             return x.cache[(cls, y)]
         else:
-            return object.__new__(cls)
+            ref = object.__new__(cls)
+            x.cache[(cls, y)] = ref
+            return ref
 
     def __init__(self, x: Block, y: Block):
         self.x, self.y = x, y
@@ -209,8 +212,7 @@ def block_size(matrix):
                 return block.piece.shape
 
 
-def make_image(matrices):
-    matrix = max_matrix(matrices)
+def make_image(matrix):
     a, b = block_size(matrix)
     m, n = matrix.shape
     image = np.ndarray((m*a, n*b))
@@ -221,22 +223,22 @@ def make_image(matrices):
     return image
 
 
-
-
 def mark(filename="test.png", shape=(10, 10)):
     image = gray(mpimg.imread(filename))
     pieces = split(image, shape)
     blocks = list(map(Block, pieces))
     good_mark(blocks)
     matrices = make_matrix(shape, blocks)
-    return make_image(matrices)
+    return matrices
 
 
 def main():
     import os
     os.system("rm out/*.png")
-    image = mark()
-    mpimg.imsave("out/result.png", image, dpi=1)
+    matrices = mark()
+    for i, matrix in enumerate(matrices):
+        image = make_image(matrix)
+        mpimg.imsave("out/%d.png" % i, image, dpi=1, cmap=cm.Greys_r)
 
 
 if __name__ == '__main__':
