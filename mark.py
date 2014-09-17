@@ -1,282 +1,243 @@
+#!/usr/bin/env python3
 import numpy as np
 import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
-
-rgb2gray = lambda rgb: np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
-
-def get_img(filename):
-    img = mpimg.imread(filename)
-    img = rgb2gray(img)
-    return img
-
-
-def split(img, shape, index):
-    shape_a, shape_b = shape
-    if len(img.shape) == 2:
-        img_height, img_width = img.shape
-    else:
-        img_height, img_width, *_ = img.shape
-    block_height, block_width = (img_height/shape_a, img_width/shape_b)
-    a, b = index
-    return img[a*block_height: (a+1)*block_height, b*block_width: (b+1)*block_width]
-
-
-def down(img, shape):
-    blocks = []
-    a, b = shape
-    for i in range(a):
-        for j in range(b):
-            piece = split(img, shape, (i, j))
-            blocks.append(piece)
-    return blocks
-
-
-def compare_line(a, b) -> float:
-    a = a[1: -1]
-    return np.sum(np.minimum(np.minimum(
-        np.fabs(a - b[0: -2]),
-        np.fabs(a - b[1: -1])),
-        np.fabs(a - b[2:])))
-
-
-def top(a, b):
-    return compare_line(a.m[0], b.m[-1])
-
-
-def right(a, b):
-    return compare_line(a.m[:, -1], b.m[:, 0])
-
-
-def bottom(a, b):
-    return top(b, a)
-
-
-def left(a, b):
-    return right(b, a)
-
-
-def find(f, base, blocks):
-    min_block = None
-    min_value = float('inf')
-    for block in blocks:
-        value = f(base, block)
-        if value < min_value:
-            min_value = value
-            min_block = block
-    return min_block, min_value
+from random import shuffle
+from lib import gray, split
 
 
 class Block:
-    top = None
-    left = None
-    bottom = None
-    right = None
-
-    def __init__(self, m):
-        self.m = m
+    def __init__(self, piece):
+        self.piece = piece
+        self.top = None
+        self.bottom = None
+        self.left = None
+        self.right = None
         self.marked = False
-
-    @property
-    def left_top(self):
-        if self.left:
-            return self.left.top
-
-    @property
-    def top_left(self):
-        if self.top:
-            return self.top.left
-
-    @property
-    def left_bottom(self):
-        if self.left:
-            return self.left.bottom
-
-    @property
-    def bottom_left(self):
-        if self.bottom:
-            return self.bottom.left
-
-    @property
-    def right_top(self):
-        if self.right:
-            return self.right.top
-
-    @property
-    def top_right(self):
-        if self.top:
-            return self.top.right
-
-    @property
-    def right_bottom(self):
-        if self.right:
-            return self.right.bottom
-
-    @property
-    def bottom_right(self):
-        if self.bottom:
-            return self.bottom.right
+        self.cache = dict()
 
 
-def up_right_mark(blocks: set):
-    for block in blocks:
-        right_block, _ = find(right, block, blocks)
-        top_block, _ = find(top, block, blocks)
-        top_right_block, _ = find(right, top_block, blocks)
-        top_right_bottom_block, _ = find(bottom, top_right_block, blocks)
-        if top_right_bottom_block is right_block:
-            block.right = right_block
-            right_block.left = block
+class Reference:
+    reverse = None
 
-            block.top = top_block
-            top_block.bottom = block
-
-            top_block.right = top_right_block
-            top_right_block.left = top_block
-
-            top_right_block.bottom = right_block
-            right_block.up = top_right_block
-
-            block.marked = True
-            top_block.marked = True
-            top_right_block.marked = True
-            top_right_bottom_block.marked = True
-            right_block.marked = True
-
-
-def left_bottom_mark(blocks: set):
-    for block in blocks:
-        bottom_block, _ = find(bottom, block, blocks)
-        left_block, _ = find(left, block, blocks)
-        left_bottom_block, _ = find(bottom, left_block, blocks)
-        left_bottom_right_block, _ = find(right, left_bottom_block, blocks)
-        if bottom_block is left_bottom_right_block:
-            block.bottom = bottom_block
-            bottom_block.top = block
-            block.left = left_block
-            left_block.right = block
-            left_block.bottom = left_bottom_block
-            left_bottom_block.top = left_block
-            left_bottom_block.right = bottom_block
-            bottom_block.left = left_bottom_block
-            block.marked = True
-            left_block.marked = True
-            left_bottom_block.marked = True
-            bottom_block.marked = True
-
-
-def loop_mark(blocks: set):
-    for block in blocks:
-        bottom_block, _ = find(bottom, block, blocks)
-        left_block, _ = find(left, block, blocks)
-        left_bottom_block, _ = find(bottom, left_block, blocks)
-        left_bottom_right_block, _ = find(right, left_bottom_block, blocks)
-        if bottom_block is not left_bottom_right_block:
-            return
-
-        bottom_right_block, _ = find(right, bottom_block, blocks)
-        bottom_right_top_block, _ = find(top, bottom_right_block, blocks)
-        bottom_right_top_left_block, _ = find(left, bottom_right_top_block, blocks)
-
-        if bottom_right_top_left_block is block:
-            block.bottom = bottom_block
-            bottom_block.top = block
-            block.left = left_block
-            left_block.right = block
-            left_block.bottom = left_bottom_block
-            left_bottom_block.top = left_block
-            left_bottom_block.right = bottom_block
-            bottom_block.left = left_bottom_block
-            bottom_block.right = bottom_right_block
-            bottom_right_block.left = bottom_block
-            bottom_right_block.top = bottom_right_top_block
-            bottom_right_top_block.bottom = bottom_right_block
-            bottom_right_top_block.left = block
-            block.right = bottom_right_top_block
-            for i in [block, left_bottom_block, left_block, left_bottom_right_block,
-                      bottom_right_block, bottom_block, bottom_right_block, bottom_right_top_block]:
-                i.marked = True
-
-
-def auxiliary_mark(blocks: set, threshold):
-    marked = set(filter(lambda x: x.marked, blocks))
-    not_marked = blocks - marked
-    for block in not_marked:
-        found, v = find(left, block, marked)
-        if v < threshold:
-            block.left = found
-            found.right = block
+    def __new__(cls, x: Block, y: Block):
+        if (cls, y) in x.cache:
+            return x.cache[(cls, y)]
         else:
-            found, v = find(bottom, block, marked)
-            if v < threshold:
-                block.bottom = found
-                found.top = block
+            return object.__new__(cls)
+
+    def __init__(self, x: Block, y: Block):
+        self.x, self.y = x, y
+        self.value = self.diff()
+
+    @classmethod
+    def get_attr(cls) -> str:
+        return cls.__name__.lower()
+
+    @staticmethod
+    def line_compare(a, b) -> float:
+        l = a[1: -1]
+        return np.sum(np.minimum(np.minimum(
+            np.fabs(l - b[0: -2]),
+            np.fabs(l - b[1: -1])),
+            np.fabs(l - b[2:])))
+
+    @staticmethod
+    def get_line(x):
+        return x[0]
+
+    @classmethod
+    def get(cls, x):
+        return getattr(x, cls.get_attr())
+
+    @classmethod
+    def set(cls, x, y):
+        return setattr(x, cls.get_attr(), y)
+
+    def diff(self):
+        a = self.get_line(self.x.piece)
+        b = self.reverse.get_line(self.y.piece)
+        return self.line_compare(a, b)
+
+    def setup(self):
+        self.set(self.x, self.y)
+        self.reverse.set(self.y, self.x)
+        self.x.marked = True
+        self.y.marked = True
 
 
-def piece_together(slices: list, aux, threshold, up_first):
-    blocks = set(map(Block, slices))
-    left_bottom_mark(blocks)
-    loop_mark(blocks)
-    if aux:
-        auxiliary_mark(blocks, threshold)
+class Top(Reference):
+    @staticmethod
+    def get_line(x):
+        return x[0]
 
+
+class Bottom(Reference):
+    @staticmethod
+    def get_line(x):
+        return x[-1]
+
+
+class Left(Reference):
+    @staticmethod
+    def get_line(x):
+        return x[..., 0]
+
+
+class Right(Reference):
+    @staticmethod
+    def get_line(x):
+        return x[..., -1]
+
+
+def reverse(a, b):
+    a.reverse = b
+    b.reverse = a
+
+
+reverse(Top, Bottom)
+reverse(Left, Right)
+
+
+loop_a = (Top, Right, Bottom, Left)
+loop_b = (Left, Top, Right, Bottom)
+loop_c = (Bottom, Left, Top, Right)
+loop_d = (Right, Bottom, Left, Top)
+loops = (loop_a, loop_b, loop_c, loop_d)
+
+
+def diff_min(li):
+    return min(li, key=lambda x: x.value)
+
+
+def search(blocks, block, step):
+    return diff_min((step(block, i) for i in blocks))
+
+
+def make_ring(blocks, block, steps):
+    ring = []
+    for step in steps:
+        if step.get(block):
+            ref = step(block, step.get(block))
+        else:
+            ref = search(blocks, block, step)
+        block = ref.y
+        ring.append(ref)
+    return ring
+
+
+def build_ring(ring):
+    for ref in ring:
+        ref.setup()
+
+
+def is_well_rings(rings, center):
+    for ring in rings:
+        if ring[-1].y is not center:
+            return False
+
+    linked = lambda a, b: a[0].y is b[-2].y
+
+    prev = None
+    for ring in rings:
+        if prev and not linked(prev, ring):
+            return False
+        prev = ring
+
+    return True
+
+
+def good_mark(blocks: list):
+    find_blocks = blocks.copy()
+    shuffle(find_blocks)
+    for block in blocks:
+        rings = [make_ring(find_blocks, block, loop) for loop in loops]
+        if is_well_rings(rings, block):
+            print("LOOP RINGS")
+            for ring in rings:
+                build_ring(ring)
     return blocks
 
 
-def make_img(img, shape, blocks):
-    img_height, img_width = img.shape
-    shape_a, shape_b = shape
-    block_height, block_width = (img_height/shape_a, img_width/shape_b)
-    new_list = []
+def make_matrix(shape, blocks):
+    a, b = shape
+    matrices = []
     close = set()
+
     for block in blocks:
         if block in close:
             continue
-        a, b = img_height*2, img_width*2
         a_min, a_max, b_min, b_max = a, 0, b, 0
-        new = np.ndarray((a, b))
-        open_table = [(block, (a//2, b//2))]
+        matrix = np.ndarray((a*2, b*2), dtype=object)
+        open_table = [(block, (a, b))]
         while open_table:
             block, shift = open_table.pop()
-            if block in close:
+            if not block or block in close:
                 continue
-            else:
-                close.add(block)
+            close.add(block)
             a, b = shift
-            ah, bw = a+block_height, b+block_width
-            try:
-                new[a: ah, b: bw] = block.m
-            except ValueError as e:
-                print(new.shape)
-                print((a, ah))
-                print((b, bw))
-                print(block.m)
-                print(new[a: ah, b: bw])
-                raise e
+            matrix[a, b] = block
 
-            # update show range.
             a_min = a if a < a_min else a_min
-            a_max = ah if ah > a_max else a_max
+            a_max = a if a > a_max else a_max
             b_min = b if b < b_min else b_min
-            b_max = bw if bw > b_max else b_max
+            b_max = b if b > b_max else b_max
 
-            if block.top:
-                open_table.append((block.top, (a-block_height, b)))
-            if block.right:
-                open_table.append((block.right, (a, b+block_width)))
-            if block.bottom:
-                open_table.append((block.bottom, (a+block_height, b)))
-            if block.left:
-                open_table.append((block.left, (a, b-block_width)))
-        new_list.append(new[a_min: a_max, b_min: b_max])
-    return new_list
+            open_table.append((block.top, (a-1, b)))
+            open_table.append((block.right, (a, b+1)))
+            open_table.append((block.bottom, (a+1, b)))
+            open_table.append((block.left, (a, b-1)))
+        matrices.append(matrix[a_min: a_max+1, b_min: b_max+1])
+    return matrices
 
 
-def main(filename="test.png", shape=(16, 16), aux=True, threshold=1, up_first=True):
-    img = get_img(filename)
-    slices = down(img, shape)
-    blocks = piece_together(slices, aux, threshold, up_first)
-    return make_img(img, shape, blocks)
+def max_matrix(matrices):
+    max = 0
+    m = None
+    for matrix in matrices:
+        a, b = matrix.shape
+        now = a*b
+        if now > max:
+            max = now
+            m = matrix
+    return m
+
+
+def block_size(matrix):
+    for line in matrix:
+        for block in line:
+            if block:
+                return block.piece.shape
+
+
+def make_image(matrices):
+    matrix = max_matrix(matrices)
+    a, b = block_size(matrix)
+    m, n = matrix.shape
+    image = np.ndarray((m*a, n*b))
+    for i, line in enumerate(matrix):
+        for j, block in enumerate(line):
+            if block:
+                image[a*i: a*i+a, b*j: b*j+b] = block.piece
+    return image
+
+
+
+
+def mark(filename="test.png", shape=(10, 10)):
+    image = gray(mpimg.imread(filename))
+    pieces = split(image, shape)
+    blocks = list(map(Block, pieces))
+    good_mark(blocks)
+    matrices = make_matrix(shape, blocks)
+    return make_image(matrices)
+
+
+def main():
+    import os
+    os.system("rm out/*.png")
+    image = mark()
+    mpimg.imsave("out/result.png", image, dpi=1)
 
 
 if __name__ == '__main__':
-    pass
+    main()

@@ -41,13 +41,22 @@ class Direction:
     def diff(self):
         pass
 
+    @property
+    def back(self):
+        pass
+
+    @property
+    def invalid(self):
+        return self.back or self.back is not self.x
+
     @staticmethod
     def compare_line(l1, l2) -> float:
         l1 = l1[1: -1]
-        return np.sum(np.minimum(np.minimum(
+        ret = np.sum(np.minimum(np.minimum(
             np.fabs(l1 - l2[0: -2]),
             np.fabs(l1 - l2[1: -1])),
             np.fabs(l1 - l2[2:])))
+        return ret
 
     @staticmethod
     def set_up(x, y):
@@ -68,6 +77,10 @@ class Top(Direction):
         x.top = y
         y.bottom = x
 
+    @property
+    def back(self):
+        return self.y.bottom
+
 
 class Right(Direction):
     def diff(self):
@@ -77,6 +90,10 @@ class Right(Direction):
     def set_up(x, y):
         x.right = y
         y.left = x
+
+    @property
+    def back(self):
+        return self.y.left
 
 
 class Bottom(Direction):
@@ -88,6 +105,10 @@ class Bottom(Direction):
         x.bottom = y
         y.top = x
 
+    @property
+    def back(self):
+        return self.y.top
+
 
 class Left(Direction):
     def diff(self):
@@ -98,11 +119,23 @@ class Left(Direction):
         x.left = y
         y.right = x
 
+    @property
+    def back(self):
+        return self.y.right
+
+
+loop_a = (Top, Right, Bottom, Left)
+loop_b = (Left, Top, Right, Bottom)
+loop_c = (Bottom, Left, Top, Right)
+loop_d = (Right, Bottom, Left, Top)
+
+
+def diff_min(li):
+    return min(li, key=lambda x: x.diff_value)
+
 
 def search(blocks, base, direction):
-    return min(
-        (direction(base, block) for block in blocks),
-        key=lambda x: x.diff_value)
+    return diff_min((direction(base, block) for block in blocks))
 
 
 def get_trace(blocks, block, steps):
@@ -114,43 +147,30 @@ def get_trace(blocks, block, steps):
     return trace
 
 
-def build_trace(trace):
-    for i in trace:
-        i.build()
+def build_trace(*traces):
+    for trace in traces:
+        for ref in trace:
+            print(">> ID LOOP <<")
+            ref.build()
 
 
-def mark(blocks):
-    id_steps_a = (Top, Right, Bottom, Left)
-    id_steps_b = (Right, Top, Left, Bottom)
-    id_steps_c = (Top, Left, Bottom, Right)
-    id_steps_d = (Left, Top, Right, Bottom)
-    id_steps_e = (Bottom, Right, Top, Left)
-    id_steps_f = (Right, Bottom, Left, Top)
-    id_steps_g = (Bottom, Left, Top, Right)
-    id_steps_h = (Left, Bottom, Right, Top)
-    find_blocks = blocks
+def mark(pieces):
+    blocks = list(map(Block, pieces))
+    steps = (loop_a, loop_b, loop_c, loop_d)
+    linked = lambda x, y: x[0].y is y[-2].y
 
     for block in blocks:
-        is_id = lambda trace: trace[-1].y is block
-        trace_a = get_trace(find_blocks, block, id_steps_a)
-        trace_d = get_trace(find_blocks, block, id_steps_d)
-        trace_g = get_trace(find_blocks, block, id_steps_g)
-        trace_e = get_trace(find_blocks, block, id_steps_e)
-        f = lambda trace: trace[0].y
-        g = lambda trace: trace[-2].y
-        if is_id(trace_a) and is_id(trace_d) and is_id(trace_g) and is_id(trace_e) and\
-                f(trace_a) is g(trace_d) and f(trace_d) is g(trace_g) and g(trace_a) is g(trace_e):
-            print("id")
-            build_trace(trace_a)
-            build_trace(trace_d)
-            build_trace(trace_g)
-            build_trace(trace_e)
+        loop = lambda trace: trace[-1].y is block
+        a, b, c, d = [get_trace(blocks, block, step) for step in steps]
 
+        if loop(a) and loop(b) and loop(c) and loop(d) and\
+                linked(a, b) and linked(b, c) and linked(c, d) and linked(d, a):
+            build_trace(a, b, c, d)
     return blocks
 
 
 def make_solved_image(img, shape, blocks):
-    img_height, img_width = img.shape
+    img_height, img_width, *c = img.shape
     shape_a, shape_b = shape
     block_height, block_width = (img_height/shape_a, img_width/shape_b)
     new_list = []
@@ -160,7 +180,8 @@ def make_solved_image(img, shape, blocks):
             continue
         a, b = img_height*20, img_width*20
         a_min, a_max, b_min, b_max = a, 0, b, 0
-        new = np.ndarray((a, b))
+        new_shape = (a, b, c) if c else (a, b)
+        new = np.ndarray(new_shape)
         open_table = [(block, (a//2, b//2))]
         while open_table:
             block, shift = open_table.pop()
@@ -189,5 +210,5 @@ def make_solved_image(img, shape, blocks):
 def jigsaw(filename="test.png", shape=(10, 10)):
     image = make_image_array(filename)
     piece_list = down(image, shape)
-    blocks = mark(list(map(Block, piece_list)))
+    blocks = mark(piece_list)
     return make_solved_image(image, shape, blocks)

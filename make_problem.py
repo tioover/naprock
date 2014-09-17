@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 
-from mark import np, mpimg, down
+from jigsaw import np, mpimg, down
 from random import shuffle
 
 
@@ -9,7 +9,8 @@ input_file_name = sys.argv[1]
 shape = int(sys.argv[2]), int(sys.argv[3])
 output_file_name = sys.argv[4] if len(sys.argv) > 4 else "problem.png"
 img = mpimg.imread(input_file_name)
-print(img)
+mpimg.imsave(output_file_name, img, dpi=1)
+img = mpimg.imread(output_file_name)
 
 a, b = shape
 img_a, img_b, img_c = img.shape
@@ -28,5 +29,3 @@ for i in range(a):
         new[i*m: i*m+m, j*n: j*n+n] = piece
 mpimg.imsave(output_file_name, new, dpi=1)
 t = mpimg.imread(output_file_name)
-print(t)
-print(t.shape, img.shape)
