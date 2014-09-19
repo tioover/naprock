@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import sys
+import numpy as np
+import matplotlib.image as mpimg
 
-from mark import np, mpimg, split
+from lib import split
 from random import shuffle
 
 

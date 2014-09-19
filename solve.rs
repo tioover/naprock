@@ -13,8 +13,8 @@ static X: N = 10;  // 矩阵行数
 static Y: N = 10;  // 矩阵列数
 static MAX_LOOP: uint = 100000;  // 最大循环 基本不可能达到
 static TASK_NUM: uint = 16;  // 进程数，设为 1 为单进程
-static BASE: uint = 1000;  // 最小循环数
-static THRESHOLD: uint = 2000;  // 循环阈值
+static BASE: uint = 4000;  // 最小循环数
+static THRESHOLD: uint = 4000;  // 循环阈值
 
 
 #[deriving(Clone)]
@@ -54,6 +54,22 @@ impl Node
         }
         println!("value: {} center: [{}] {} step: {}\n",
                  self.value, self.center, (self.center / y + 1, self.center % y + 1), self.depth);
+    }
+
+    fn print_step(&self)
+    {
+        match self.parent {
+            None => (),
+            Some(ref parent) => parent.print_step(),
+        }
+        match self.step {
+            Select => println!("\nselect {}", self.center),
+            Left => print!("L"),
+            Right => print!("R"),
+            Up => print!("U"),
+            Down => print!("D"),
+            Start => (),
+        }
     }
 }
 
@@ -300,8 +316,7 @@ fn main()
         let m = matrix.as_mut_slice();
         task_rng().shuffle(m);
     }
-    println!("test 0");
     let solution = solve(Arc::new(matrix), (X, Y), 16);
     solution.print();
-    println!("test 1");
+    solution.print_step();
 }

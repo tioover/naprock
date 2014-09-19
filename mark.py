@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.image as mpimg
 from random import shuffle
-from lib import gray, split
+from lib import gray, split, image_matrix
 import matplotlib.cm as cm
 
 
@@ -19,18 +19,17 @@ class Block:
 
 class Reference:
     reverse = None
-
-    def __new__(cls, x: Block, y: Block):
-        if (cls, y) in x.cache:
-            return x.cache[(cls, y)]
-        else:
-            ref = object.__new__(cls)
-            x.cache[(cls, y)] = ref
-            return ref
+    temp = False
 
     def __init__(self, x: Block, y: Block):
         self.x, self.y = x, y
-        self.value = self.diff()
+        ref = self.__class__
+        key = (ref, y)
+        if key in x.cache:
+            self.value = x.cache[(ref, y)]
+        else:
+            self.value = self.diff()
+            x.cache[key] = self.value
 
     @classmethod
     def get_attr(cls) -> str:
@@ -130,6 +129,9 @@ def make_ring(blocks, block, steps):
 
 def build_ring(ring):
     for ref in ring:
+        if ref.value > 50:
+            return
+    for ref in ring:
         ref.setup()
 
 
@@ -149,8 +151,8 @@ def is_well_rings(rings, center):
     return True
 
 
-def good_mark(blocks: list):
-    find_blocks = blocks.copy()
+def good_mark(blocks):
+    find_blocks = list(blocks.copy())
     shuffle(find_blocks)
     for block in blocks:
         rings = [make_ring(find_blocks, block, loop) for loop in loops]
@@ -161,36 +163,63 @@ def good_mark(blocks: list):
     return blocks
 
 
+def lesser_mark(blocks, find_blocks: list, loop):
+    find_blocks = find_blocks.copy()
+    shuffle(find_blocks)
+    for block in blocks:
+        ring = make_ring(find_blocks, block, loop)
+        if ring[-1].y is block:
+            build_ring(ring)
+
+
+def bad_mark(blocks, find_blocks, threshold=2):
+    find_blocks = find_blocks.copy()
+    shuffle(find_blocks)
+    for block in blocks:
+        ref = search(find_blocks, block, Bottom)
+        if not ref.reverse.get(ref.y) and ref.value < threshold:
+            ref.setup()
+
+
 def make_matrix(shape, blocks):
     a, b = shape
+    m, n = a*4, b*4
+    result = []
     matrices = []
+    unmarked = set()
     close = set()
 
     for block in blocks:
-        if block in close:
+        if not block or block in close:
             continue
-        a_min, a_max, b_min, b_max = a, 0, b, 0
-        matrix = np.ndarray((a*2, b*2), dtype=object)
-        open_table = [(block, (a, b))]
+        a_min, a_max, b_min, b_max = m, 0, n, 0
+        matrix = np.ndarray((m, n), dtype=object)
+        open_table = [(block, (m//2, n//2))]
         while open_table:
             block, shift = open_table.pop()
             if not block or block in close:
                 continue
             close.add(block)
-            a, b = shift
-            matrix[a, b] = block
+            i, j = shift
+            matrix[i, j] = block
 
-            a_min = a if a < a_min else a_min
-            a_max = a if a > a_max else a_max
-            b_min = b if b < b_min else b_min
-            b_max = b if b > b_max else b_max
+            a_min = i if i < a_min else a_min
+            a_max = i if i > a_max else a_max
+            b_min = j if j < b_min else b_min
+            b_max = j if j > b_max else b_max
 
-            open_table.append((block.top, (a-1, b)))
-            open_table.append((block.right, (a, b+1)))
-            open_table.append((block.bottom, (a+1, b)))
-            open_table.append((block.left, (a, b-1)))
-        matrices.append(matrix[a_min: a_max+1, b_min: b_max+1])
-    return matrices
+            open_table.append((block.top, (i-1, j)))
+            open_table.append((block.right, (i, j+1)))
+            open_table.append((block.bottom, (i+1, j)))
+            open_table.append((block.left, (i, j-1)))
+        result.append(matrix[a_min: a_max+1, b_min: b_max+1])
+
+    for matrix in result:
+        if matrix.shape == (1, 1):
+            unmarked.add(matrix[0, 0])
+        else:
+            matrices.append(matrix)
+    return matrices, unmarked
 
 
 def max_matrix(matrices):
@@ -205,17 +234,18 @@ def max_matrix(matrices):
     return m
 
 
-def block_size(matrix):
+def first_block(matrix):
     for line in matrix:
         for block in line:
             if block:
-                return block.piece.shape
+                return block
 
 
 def make_image(matrix):
-    a, b = block_size(matrix)
+    piece = first_block(matrix).piece
+    a, b = piece.shape
     m, n = matrix.shape
-    image = np.ndarray((m*a, n*b))
+    image = np.ndarray((m*a, n*b), dtype=piece.dtype)
     for i, line in enumerate(matrix):
         for j, block in enumerate(line):
             if block:
@@ -223,22 +253,110 @@ def make_image(matrix):
     return image
 
 
-def mark(filename="test.png", shape=(10, 10)):
+def matrix_entropy(matrix):
+    def diff(x, ref):
+        y = ref.get(x)
+        if not y:
+            return 0
+        return ref(x, ref.get(x)).value
+
+    sum = 0
+    for line in matrix:
+        for block in line:
+            if block:
+                sum += diff(block, Top)
+                sum += diff(block, Right)
+                sum += diff(block, Bottom)
+                sum += diff(block, Left)
+    return sum
+
+
+def matrix_map(shape, image, matrix):
+    raw = image_matrix(image, shape)
+    a_map = {}  # raw->matrix
+    b_map = {}  # matrix->raw
+    for i, line in enumerate(matrix):
+        for j, block in enumerate(line):
+            if not block:
+                continue
+            for k, r_line in enumerate(raw):
+                if (i, j) in b_map:
+                    break
+                for l, piece in enumerate(r_line):
+                    if (k, l) not in a_map and (block.piece == piece).all():
+                        a_map[(k, l)] = (i, j)
+                        b_map[(i, j)] = (k, l)
+    for k in a_map:
+        print(k, "->", a_map[k])
+    return a_map
+
+
+def write_map(shape, map_):
+    a, b = shape
+    map_list = [None for _ in range(a*b)]
+    for key in map_:
+        i, j = key
+        k, l = map_[key]
+        m = i*b+j
+        n = k*b+l
+        try:
+            map_list[n] = m
+        except IndexError:
+            continue
+
+    with open("map.txt", "w") as f:
+        f.writelines("%d %d\n" % shape)
+        lines = []
+        for index in map_list:
+            if index:
+                lines.append("%d\n" % index)
+            else:
+                lines.append("x\n")
+        f.writelines(lines)
+    return map_list
+
+
+def mark(filename="problem.png", shape=(10, 10)):
     image = gray(mpimg.imread(filename))
     pieces = split(image, shape)
     blocks = list(map(Block, pieces))
     good_mark(blocks)
-    matrices = make_matrix(shape, blocks)
-    return matrices
+    matrices, unmarked = make_matrix(shape, blocks)
+    loops_ = list(loops)
+    shuffle(loops_)
+    #for loop in loops_:
+    #    if unmarked:
+    #        print('--')
+    #        lesser_mark(unmarked, blocks, loop)
+    #        matrices, unmarked = make_matrix(shape, blocks)
+    #if unmarked:
+    #    bad_mark(unmarked, blocks)
+    #    matrices, unmarked = make_matrix(shape, blocks)
+    matrix = max_matrix(matrices)
+    map_ = matrix_map(shape, image, matrix)
+    return matrix, map_
+
+
+def parse(argv):
+    pass
 
 
 def main():
-    import os
-    os.system("rm out/*.png")
-    matrices = mark()
-    for i, matrix in enumerate(matrices):
-        image = make_image(matrix)
-        mpimg.imsave("out/%d.png" % i, image, dpi=1, cmap=cm.Greys_r)
+    import sys
+    filename = "problem.png"
+    a, b = 10, 10
+    if len(sys.argv) == 3:
+        a = int(sys.argv[1])
+        b = int(sys.argv[2])
+    elif len(sys.argv) == 4:
+        filename = sys.argv[1]
+        a = int(sys.argv[2])
+        b = int(sys.argv[3])
+    shape = (a, b)
+    matrix, map_ = mark(filename, (a, b))
+    image = make_image(matrix)
+    mpimg.imsave("out.png", image, dpi=1, cmap=cm.Greys_r)
+    write_map(shape, map_)
 
 
 if __name__ == '__main__':
