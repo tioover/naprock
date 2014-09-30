@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.image as mpimg
 from random import shuffle
-from lib import gray, split, image_matrix
+from lib import grey, split, image_matrix
 import matplotlib.cm as cm
 
 
@@ -163,24 +163,6 @@ def good_mark(blocks):
     return blocks
 
 
-def lesser_mark(blocks, find_blocks: list, loop):
-    find_blocks = find_blocks.copy()
-    shuffle(find_blocks)
-    for block in blocks:
-        ring = make_ring(find_blocks, block, loop)
-        if ring[-1].y is block:
-            build_ring(ring)
-
-
-def bad_mark(blocks, find_blocks, threshold=2):
-    find_blocks = find_blocks.copy()
-    shuffle(find_blocks)
-    for block in blocks:
-        ref = search(find_blocks, block, Bottom)
-        if not ref.reverse.get(ref.y) and ref.value < threshold:
-            ref.setup()
-
-
 def make_matrix(shape, blocks):
     a, b = shape
     m, n = a*4, b*4
@@ -317,28 +299,15 @@ def write_map(shape, map_):
 
 
 def mark(filename="problem.png", shape=(10, 10)):
-    image = gray(mpimg.imread(filename))
+    image = grey(mpimg.imread(filename))
     pieces = split(image, shape)
     blocks = list(map(Block, pieces))
     good_mark(blocks)
     matrices, unmarked = make_matrix(shape, blocks)
     loops_ = list(loops)
     shuffle(loops_)
-    #for loop in loops_:
-    #    if unmarked:
-    #        print('--')
-    #        lesser_mark(unmarked, blocks, loop)
-    #        matrices, unmarked = make_matrix(shape, blocks)
-    #if unmarked:
-    #    bad_mark(unmarked, blocks)
-    #    matrices, unmarked = make_matrix(shape, blocks)
     matrix = max_matrix(matrices)
-    map_ = matrix_map(shape, image, matrix)
-    return matrix, map_
-
-
-def parse(argv):
-    pass
+    return matrix, matrix_map(shape, image, matrix)
 
 
 def main():

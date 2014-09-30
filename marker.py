@@ -1,98 +1,106 @@
-import random
-
 import matplotlib.image as mpimg
 import numpy as np
 
-from lib import gray, image_matrix, get_piece
+from heapq import heappop, heappush
+
+from lib import grey, image_matrix, get_piece
+
+
+class Block:
+    def __init__(self, piece):
+        self.piece = piece
+        self.bottom_cache = {}
+        self.right_cache = {}
+
+    def __lt__(self, other):
+        return True
+
+    def __cmp__(self, _):
+        return 0
 
 
 diff = lambda a, b: np.sum(np.fabs(a - b))
 
 
 def make_image(shape, matrix):
-    piece = matrix[0]
+    piece = matrix[0].piece
     a, b = shape
     m, n = piece.shape
     image = np.ndarray((m*a, n*b), dtype=piece.dtype)
-    for index, piece in enumerate(matrix):
+    for index, block in enumerate(matrix):
+        piece = block.piece
         i = index // b
         j = index % b
         image[m*i: m*i+m, n*j: n*j+n] = piece
     return image
 
 
-def cutoff(shape, matrix, threshold=20):
+def search(shape, pieces, max_loop=1000000, factor=0):
     a, b = shape
     size = a*b
-    if size < 9:
-        return False
-    now = len(matrix) - 1
-    i = now // b
-    j = now % b
-    if i > 0:
-        value = diff(matrix[now][0], matrix[b*(i-1)+j][-1])
-        if value > threshold:
-            return True
-    if j > 0:
-        value = diff(matrix[now][..., 0], matrix[now-1][..., -1])
-        if value > threshold:
-            return True
-    return False
+    entropy = lambda x: matrix_entropy(shape, x)
+    value = lambda x: (size-len(x))*factor+entropy(x)
 
-
-def try_value(pieces):
-    for piece in pieces:
-        print(diff(pieces[0][0], piece[-1]))
-
-
-def search(shape, pieces):
-    a, b = shape
-    size = a*b
-
-    # try_value(pieces)
-    # threshold = int(input("Please input threshold value:"))
     solves = []
-    open = [(0, [piece]) for piece in pieces]
+    open = []
 
-    for _ in range(1000):
-        _, matrix = open.pop()
+    for head in pieces:
+        heappush(open, (0, [head]))
+    for i in range(max_loop):
+        try:
+            _, matrix = heappop(open)
+        except IndexError:
+            break
         length = len(matrix)
+        if i % 1000 == 0:
+            print("当前长度 ", length)
         if length == size:
-            solves.append(tuple(matrix))
-            print("a solve")
+            solves.append(matrix)
+            print("在第 %8d 次循环找到了一个解" % i)
             continue
         for piece in pieces:
-            for i in matrix:
-                if i is piece:
-                    break
-            else:
-                new = matrix.copy()
-                new.append(piece)
-                open.append((matrix_entropy(shape, new), new))
-                open.sort(key=lambda x: x[0], reverse=True)
-                # if not cutoff(shape, new, threshold):
-                #     open.append(new)
+            if piece not in matrix:
+                new_matrix = matrix.copy()
+                new_matrix.append(piece)
+                heappush(open, (
+                    value(matrix),
+                    new_matrix))
+    solves.sort(key=entropy)
     return solves
 
 
 def matrix_entropy(shape, matrix):
     a, b = shape
-    value = 0
+    block_a, block_b = matrix[0].piece.shape
+    entropy = 0
     length = len(matrix)
     for now in range(length):
         i, j = now // a, now % a
         k, l = i+1, j+i
         right = now + 1
         bottom = now + b
+        block = matrix[now]
         if bottom < length and k < a:
-            value += diff(matrix[now][-1, ...], matrix[bottom][0, ...])
+            bottom_block = matrix[bottom]
+            if bottom_block in block.bottom_cache:
+                value = block.bottom_cache[bottom_block]
+            else:
+                value = diff(block.piece[-1], bottom_block.piece[0]) / block_b
+                block.bottom_cache[bottom_block] = value
+            entropy += value
         if right < length and l < b:
-            value += diff(matrix[now][..., -1], matrix[right][..., 0])
-    return value / length
+            right_block = matrix[right]
+            if right_block in block.right_cache:
+                value = block.right_cache[right_block]
+            else:
+                value = diff(block.piece[:, -1], right_block.piece[:, 0]) / block_a
+                block.right_cache[right_block] = value
+            entropy += value
+    return entropy / length
 
 
 def marker(filename, shape):
-    image = gray(mpimg.imread(filename))
+    image = grey(mpimg.imread(filename))
     raw_matrix = image_matrix(image, shape)
     pieces = get_piece(raw_matrix)
-    return search(shape, pieces)
+    return search(shape, list(map(Block, pieces)))

@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def gray(image):
+def grey(image):
     return np.dot(image[..., :3], [0.299, 0.587, 0.144])
 
 
