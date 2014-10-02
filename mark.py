@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.image as mpimg
 from random import shuffle
 from lib import grey, split, image_matrix
+from PIL import Image
 import matplotlib.cm as cm
 
 
@@ -273,34 +274,40 @@ def matrix_map(shape, image, matrix):
     return a_map
 
 
-def write_map(shape, map_):
+def write_map(shape, map_ref):
     a, b = shape
-    map_list = [None for _ in range(a*b)]
-    for key in map_:
-        i, j = key
-        k, l = map_[key]
-        m = i*b+j
-        n = k*b+l
-        try:
-            map_list[n] = m
-        except IndexError:
-            continue
+    convert = lambda x: x[0]*b+x[1]
+    map_list = [i for i in range(a*b)]
 
-    with open("map.txt", "w") as f:
+    for x in map_ref:
+        y = map_ref[x]
+        m, n = convert(x), convert(y)
+        if m > len(map_list) or n in map_list:
+            continue
+        map_list[m] = n
+
+    marked = set(map_list)
+    unmarked = list({i for i in range(a*b)} - marked)
+
+    with open("exe\in.txt", "w") as f:
         f.writelines("%d %d\n" % shape)
-        lines = []
         for index in map_list:
-            if index:
-                lines.append("%d\n" % index)
-            else:
-                lines.append("x\n")
-        f.writelines(lines)
+            if index is None:
+                index = unmarked.pop()
+            f.writelines("%d\n" % index)
+
     return map_list
 
 
 def mark(filename="problem.png", shape=(10, 10)):
+    import os
+    from scipy.misc import imresize
     image = grey(mpimg.imread(filename))
     pieces = split(image, shape)
+    os.system("rm *.png")
+    for i, piece in enumerate(pieces):
+        w, h = piece.shape
+        mpimg.imsave("exe/%d.png" % i, imresize(piece, 20))
     blocks = list(map(Block, pieces))
     good_mark(blocks)
     matrices, unmarked = make_matrix(shape, blocks)

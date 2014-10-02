@@ -305,6 +305,9 @@ fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
         println!("=========={}", i);
         root.print();
     }
+	println!("end");
+	root.print();
+	// root.print_step();
     root
 }
 
@@ -317,6 +320,4 @@ fn main()
         task_rng().shuffle(m);
     }
     let solution = solve(Arc::new(matrix), (X, Y), 16);
-    solution.print();
-    solution.print_step();
 }
