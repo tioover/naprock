@@ -3,6 +3,9 @@ use std::num::abs;
 use std::collections::HashMap;
 use std::rand::{task_rng, Rng};
 use std::comm;
+use std::os;
+use std::io::BufferedReader;
+use std::io::File;
 
 type M = u8;
 type N = int;
@@ -12,7 +15,7 @@ type Value = int;
 static X: N = 10;  // 矩阵行数
 static Y: N = 10;  // 矩阵列数
 static MAX_LOOP: uint = 100000;  // 最大循环 基本不可能达到
-static TASK_NUM: uint = 16;  // 进程数，设为 1 为单进程
+static TASK_NUM: uint = 1;  // 进程数，设为 1 为单进程
 static BASE: uint = 4000;  // 最小循环数
 static THRESHOLD: uint = 4000;  // 循环阈值
 
@@ -70,6 +73,42 @@ impl Node
             Down => print!("D"),
             Start => (),
         }
+    }
+    
+    fn write_step(&self)
+    {
+        let (_, b) = self.shape;
+        let mut steps = Vec::new();
+        let mut now = self;
+        let mut select_num = 0u;
+        let mut swap_num = 0u;
+        loop {
+            steps.push(match now.step {
+                Select => {
+                    let center = now.center;
+                    let pos = (center % b) * 16 + (center / b);
+					let now_swap = swap_num;
+                    swap_num = 0;
+                    select_num += 1;
+                    format!("\r\n{:02X}\r\n{}\r\n", pos, now_swap)
+                },
+                Left => {swap_num += 1; "L".to_string()},
+                Right => {swap_num += 1; "R".to_string()},
+                Up => {swap_num += 1; "U".to_string()},
+                Down => {swap_num += 1; "D".to_string()},
+                Start => break,
+            });
+			match now.parent {
+			    Some(ref next) => {now = next.deref();},
+				None => fail!("not break???")
+			}
+        }
+        steps.push(format!("{}", select_num));	
+        let mut file = File::create(&Path::new("solved.txt"));
+		steps.reverse();
+		for line in steps.iter() {
+            file.write(line.as_bytes());
+		}
     }
 }
 
@@ -287,7 +326,7 @@ fn solve_loop(root: Arc<Node>) -> Arc<Node>
 }
 
 
-fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
+fn solve(matrix: Matrix, shape: Shape, select_num: uint)
 {
     let mut root = Arc::new(Node {
         value: valuation(&matrix, shape),
@@ -305,19 +344,30 @@ fn solve(matrix: Matrix, shape: Shape, select_num: uint) -> Arc<Node>
         println!("=========={}", i);
         root.print();
     }
-	println!("end");
-	root.print();
-	// root.print_step();
-    root
+    println!("===");
+    root.print();
+    println!("write");
+    root.write_step();
+    println!("end");
+}
+
+
+fn str_int(x: &String) -> int {
+    match from_str(x.as_slice().trim()) {Some(n) => n, None => fail!("args error")}
 }
 
 
 fn main()
 {
-    let mut matrix = Vec::from_fn((X*Y) as uint, |id| id as u8);
-    {
-        let m = matrix.as_mut_slice();
-        task_rng().shuffle(m);
-    }
-    let solution = solve(Arc::new(matrix), (X, Y), 16);
+	let args = os::args();
+	let nums: Vec<int> = args.slice(1, args.len()).iter().map(str_int).collect();
+	println!("{}", nums);
+	let x: int = nums[0];
+	let y: int = nums[1];
+	let path = Path::new("marked.txt");
+	let mut file = BufferedReader::new(File::open(&path));
+	let lines: Vec<String> = file.lines().map(|x| x.unwrap()).collect();
+	let matrix: Vec<u8> = lines.iter().map(|x| str_int(x) as u8).collect();
+	println!("{}", matrix);
+    solve(Arc::new(matrix), (x, y), 16);
 }
