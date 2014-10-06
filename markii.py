@@ -5,6 +5,7 @@ from random import shuffle
 import matplotlib.image as mpimg
 import numpy as np
 
+from numba import jit
 from lib import grey, image_matrix, get_piece
 
 
@@ -109,7 +110,7 @@ def matrix_entropy(shape, matrix):
     size = len(matrix)
     length = 0
     for index, block in enumerate(matrix):
-        if block is None:
+        if not block:
             continue
         length += 1
         i, j = index // a, index % a
@@ -132,18 +133,23 @@ def matrix_entropy(shape, matrix):
 diff_min = lambda x: min(x.items(), key=lambda y: y[1])[0]
 
 
-def state_search(shape, blocks, max_loop=10000):
+def get_value(shape, height, mat, factor):
     a, b = shape
     size = a*b
-    blank_matrix = [None for _ in range(size)]
+    entropy = matrix_entropy(shape, mat)
+    height_value = (size-height)*factor
+    return height_value + entropy
+
+
+def state_search(shape, blocks):
+    a, b = shape
+    size = a*b
+    blank_matrix = [None] * size
     solves = []
     open_list = []
-    print(matrix_entropy(shape, list(blocks)))
-
-    def get_value(height, mat, factor=0.22):
-        entropy = matrix_entropy(shape, mat)
-        height_value = (size-height)*factor
-        return height_value + entropy
+    factor = input("Input acceleration factor (default 0.0): ") or 0.0
+    max_loop = input("Input max loop number (default 50000): ") or 50000
+    max_loop, factor = int(max_loop), float(factor)
 
     for head in blocks:
         matrix = blank_matrix.copy()
@@ -152,60 +158,44 @@ def state_search(shape, blocks, max_loop=10000):
 
     shuffle(open_list)
 
+    one_of_max_loop = max_loop // 100
+
     for loop_num in range(max_loop):
         if not open_list:
             break
         if len(open_list) > max_loop * 2:
             open_list = open_list[: max_loop]
-
-        value, num, matrix = heappop(open_list)
-        if num == size:
-            heappush(solves, (value, matrix))
-            print("a solve")
-            continue
-
-        for i in range(size):
-            if matrix[i] is not None:
+        if loop_num % one_of_max_loop == 0:
+            print("%2d %%" % (loop_num // one_of_max_loop))
+        try:
+            value, num, matrix = heappop(open_list)
+            if num == size:
+                heappush(solves, (value, matrix))
+                print("a solve")
                 continue
-            pre_open = []
-            for new_block in blocks:
-                if new_block in matrix:
+            for i in range(size):
+                if matrix[i]:
                     continue
-                new_matrix = matrix.copy()
-                new_matrix[i] = new_block
-                pre_open.append((
-                    get_value(num+1, new_matrix),
-                    num+1,
-                    new_matrix
-                ))
-            pre_open.sort()
-            for item in pre_open[:8]:
-                heappush(open_list, item)
+                pre_open = []
+                for new_block in blocks:
+                    if new_block in matrix:
+                        continue
+                    new_matrix = matrix.copy()
+                    new_matrix[i] = new_block
+                    pre_open.append((
+                        get_value(shape, num+1, new_matrix, factor),
+                        num+1,
+                        new_matrix
+                    ))
+                pre_open.sort()
+                for item in pre_open[:8]:
+                    heappush(open_list, item)
+                break
+        except KeyboardInterrupt:
             break
-        #
-        # next_num = num
-        # while True:
-        #     next_matrix = matrix.copy()
-        #     added = False
-        #     for i, block in enumerate(matrix):
-        #         if block is None:
-        #             continue
-        #         if block.right and (i+1) % b != 0 and next_matrix[i+1] is None:
-        #             next_matrix[i+1] = block.right
-        #             next_num += 1
-        #             added = True
-        #         if block.bottom and i+b < size and next_matrix[i+b] is None:
-        #             next_matrix[i+b] = block.bottom
-        #             next_num += 1
-        #             added = True
-        #     if added:
-        #         heappush(open_list, (get_value(next_num, next_matrix), next_num, next_matrix))
-        #         matrix = next_matrix
-        #     else:
-        #         break
 
     solves.sort(key=lambda x: x[0])
-    return solves
+    return [solve[1] for solve in solves]
 
 
 def block_link(blocks):
@@ -230,8 +220,8 @@ def set_cache(blocks):
         block.set_cache(blocks)
 
 
-def marker(filename, shape):
-    image = grey(mpimg.imread(filename))
+def marker(shape, img):
+    image = grey(img)
     raw_matrix = image_matrix(image, shape)
     pieces = get_piece(raw_matrix)
     blocks = list(map(Block, pieces))
@@ -241,16 +231,17 @@ def marker(filename, shape):
     if len(blocks) <= 9:
         print("make matrices")
         matrices = list(permutations(blocks))
+        print("done")
         print("sort matrices")
         matrices.sort(key=lambda x: matrix_entropy(shape, x))
-        return matrices
+        print("done")
     else:
         # print("done\nlink block...")
         # block_link(blocks)
         print("make matrices...")
         matrices = state_search(shape, blocks)
         print("done")
-        return matrices
+    return blocks, matrices
 
 
 def matrix_to_image(shape, matrix):
@@ -264,3 +255,47 @@ def matrix_to_image(shape, matrix):
         j = index % b
         image[m*i: m*i+m, n*j: n*j+n] = piece
     return image
+
+
+def out(shape, blocks, solves):
+    import os
+    print("write file")
+    os.system("del preview\*.png")
+    i = 0
+    maximum = 10
+    for matrix in solves:
+        if i > maximum:
+            break
+        mpimg.imsave("preview\%d.png" % i, matrix_to_image(shape, matrix), dpi=1)
+        i += 1
+    print("done")
+    i = int(input("Choose a solve (default 0): ") or 0)
+    solve = solves[i]
+
+    ref = []
+    for block in solve:
+        ref.append(blocks.index(block))
+
+    with open("exe\in.txt", "w") as f:
+        f.writelines("%d %d\n" % shape)
+        for r in ref:
+            f.writelines("%d\n" % r)
+
+    with open("marked.txt", "w") as f:
+        for r in ref:
+            f.writelines("%d\n" % r)
+
+
+def main():
+    import sys
+    a = int(sys.argv[1])
+    b = int(sys.argv[2])
+    shape = a, b
+    image = mpimg.imread("problem.png")
+    blocks, matrices = marker(shape, image)
+    out(shape, blocks, matrices)
+
+
+
+if __name__ == '__main__':
+    main()
