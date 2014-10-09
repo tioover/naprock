@@ -5,7 +5,7 @@ from random import shuffle
 import matplotlib.image as mpimg
 import numpy as np
 
-from numba import jit
+#from numba import jit
 from lib import grey, image_matrix, get_piece
 
 
@@ -228,7 +228,7 @@ def marker(shape, img):
     print("diff value computing...")
     set_cache(blocks)
     print("done")
-    if len(blocks) <= 9:
+    if len(blocks) < 9:
         print("make matrices")
         matrices = list(permutations(blocks))
         print("done")
@@ -273,12 +273,16 @@ def out(shape, blocks, solves):
     solve = solves[i]
 
     ref = []
+    exe_ref = []
+    for block in blocks:
+        ref.append(solve.index(block))
+
     for block in solve:
-        ref.append(blocks.index(block))
+	    exe_ref.append(blocks.index(block))
 
     with open("exe\in.txt", "w") as f:
         f.writelines("%d %d\n" % shape)
-        for r in ref:
+        for r in exe_ref:
             f.writelines("%d\n" % r)
 
     with open("marked.txt", "w") as f:
