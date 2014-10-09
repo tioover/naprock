@@ -1,3 +1,6 @@
+import os
+import platform
+
 from itertools import permutations
 from heapq import heappop, heappush
 from random import shuffle
@@ -5,7 +8,6 @@ from random import shuffle
 import matplotlib.image as mpimg
 import numpy as np
 
-#from numba import jit
 from lib import grey, image_matrix, get_piece
 
 
@@ -141,23 +143,16 @@ def get_value(shape, height, mat, factor):
     return height_value + entropy
 
 
-def state_search(shape, blocks):
+def state_search(shape, blocks, head_num=4):
     a, b = shape
     size = a*b
-    blank_matrix = [None] * size
     solves = []
-    open_list = []
     factor = input("Input acceleration factor (default 0.0): ") or 0.0
     max_loop = input("Input max loop number (default 50000): ") or 50000
     max_loop, factor = int(max_loop), float(factor)
 
-    for head in blocks:
-        matrix = blank_matrix.copy()
-        matrix[0] = head
-        open_list.append((0, 1, matrix))
-
+    open_list = [(0, 1, [head]) for head in blocks[: head_num]]
     shuffle(open_list)
-
     one_of_max_loop = max_loop // 100
 
     for loop_num in range(max_loop):
@@ -167,32 +162,28 @@ def state_search(shape, blocks):
             open_list = open_list[: max_loop]
         if loop_num % one_of_max_loop == 0:
             print("%2d %%" % (loop_num // one_of_max_loop))
-        try:
-            value, num, matrix = heappop(open_list)
-            if num == size:
-                heappush(solves, (value, matrix))
-                print("a solve")
+        value, num, matrix = heappop(open_list)
+        if num == size:
+            heappush(solves, (value, matrix))
+            print("A SOLUTION")
+            continue
+        for new_block in blocks:
+            if new_block in matrix:
                 continue
-            for i in range(size):
-                if matrix[i]:
-                    continue
-                pre_open = []
-                for new_block in blocks:
-                    if new_block in matrix:
-                        continue
-                    new_matrix = matrix.copy()
-                    new_matrix[i] = new_block
-                    pre_open.append((
-                        get_value(shape, num+1, new_matrix, factor),
-                        num+1,
-                        new_matrix
-                    ))
-                pre_open.sort()
-                for item in pre_open[:8]:
-                    heappush(open_list, item)
-                break
-        except KeyboardInterrupt:
-            break
+            new_front = [new_block]
+            new_tail = matrix.copy()
+            new_front.extend(matrix)
+            new_tail.append(matrix)
+            heappush(open_list, (
+                get_value(shape, num+1, new_front, factor),
+                num+1,
+                new_front
+            ))
+            heappush(open_list, (
+                get_value(shape, num+1, new_tail, factor),
+                num+1,
+                new_tail,
+            ))
 
     solves.sort(key=lambda x: x[0])
     return [solve[1] for solve in solves]
@@ -258,15 +249,19 @@ def matrix_to_image(shape, matrix):
 
 
 def out(shape, blocks, solves):
-    import os
+    is_windows = platform.system() == "Windows"
     print("write file")
-    os.system("del preview\*.png")
+    if is_windows:
+        os.system("del preview\*.png")
+    else:
+        os.system("rm preview/*.png")
     i = 0
     maximum = 10
     for matrix in solves:
         if i > maximum:
             break
-        mpimg.imsave("preview\%d.png" % i, matrix_to_image(shape, matrix), dpi=1)
+        mpimg.imsave(
+            os.path.join("preview", "%d.png" % i), matrix_to_image(shape, matrix), dpi=1)
         i += 1
     print("done")
     i = int(input("Choose a solve (default 0): ") or 0)
@@ -278,9 +273,9 @@ def out(shape, blocks, solves):
         ref.append(solve.index(block))
 
     for block in solve:
-	    exe_ref.append(blocks.index(block))
+        exe_ref.append(blocks.index(block))
 
-    with open("exe\in.txt", "w") as f:
+    with open(os.path.join("exe", "in.txt"), "w") as f:
         f.writelines("%d %d\n" % shape)
         for r in exe_ref:
             f.writelines("%d\n" % r)

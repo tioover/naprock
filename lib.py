@@ -1,4 +1,9 @@
+import os
+
 import numpy as np
+
+#from scipy.misc import imresize
+from matplotlib.image import imsave
 
 
 def grey(image):
@@ -32,3 +37,11 @@ def split(image, shape):
             i*block_height: (i+1)*block_height,
             j*block_width: (j+1)*block_width
         ] for i in range(a) for j in range(b)]
+
+
+def split_and_save(image, shape, path, zoom=1):
+    for i, piece in enumerate(split(image, shape)):
+        imsave(
+            os.path.join(path, "%d.png" % i),
+            piece
+        )
