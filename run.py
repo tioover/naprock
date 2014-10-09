@@ -7,14 +7,9 @@ from markii import marker, out
 from config import player_id, server, raw_problem_filename, solve_filename
 
 
-def main():
+def main(problem_id):
     print("Get Problem...")
-    problem_id = None
-    while not problem_id:
-        try:
-            problem_id = input("Input Problem ID: ")
-        except:
-            problem_id = None
+    problem_id = input("Input Problem ID (default %s): " % problem_id) or problem_id
     os.system(".\client.exe GetProblem %s %s %s" % (server, problem_id, raw_problem_filename))
     print("Get Problem DONE")
     with open(raw_problem_filename, "rb") as img_file:
@@ -45,7 +40,7 @@ def main():
     print("Done")
     print("========")
     input("Are you ready solve? (Press Enter)")
-    # DO SOMETHING
+    os.system(".\\solve.exe %d %d" % shape)
     print("Done")
     print("Submit Answer")
     os.system(".\\client.exe SubmitAnswer %s %s %d %s" % (
@@ -54,4 +49,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    for i in range(10000):
+        main(str(i))
