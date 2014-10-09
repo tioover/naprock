@@ -16,7 +16,7 @@ def main(problem_id):
         _ = img_file.readline()
         shape_str, select_num_str, cost_str = [img_file.readline().decode().replace(
             "#", "").strip() for _ in range(3)]
-    a, b = [int(i) for i in shape_str.split()]
+    b, a = [int(i) for i in shape_str.split()]
     shape = (a, b)
     select_num = int(select_num_str)
     select_cost, swap_cost = [int(i) for i in cost_str.split()]
