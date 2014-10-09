@@ -6,6 +6,7 @@ from heapq import heappop, heappush
 from random import shuffle
 
 import matplotlib.image as mpimg
+import matplotlib.cm as cm
 import numpy as np
 
 from lib import grey, image_matrix, get_piece
@@ -261,7 +262,11 @@ def out(shape, blocks, solves):
         if i > maximum:
             break
         mpimg.imsave(
-            os.path.join("preview", "%d.png" % i), matrix_to_image(shape, matrix), dpi=1)
+            os.path.join("preview", "%d.png" % i),
+            matrix_to_image(shape, matrix),
+            dpi=1,
+            cmap=cm.Greys,
+        )
         i += 1
     print("done")
     i = int(input("Choose a solve (default 0): ") or 0)

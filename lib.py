@@ -39,7 +39,7 @@ def split(image, shape):
         ] for i in range(a) for j in range(b)]
 
 
-def split_and_save(image, shape, path, zoom=1):
+def split_and_save(image, shape, path):
     for i, piece in enumerate(split(image, shape)):
         imsave(
             os.path.join(path, "%d.png" % i),
