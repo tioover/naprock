@@ -1,8 +1,11 @@
 use std::os;
 use std::rand::{task_rng, Rng};
-use std::rc::Rc;
 use std::num::abs;
+use std::comm;
+use std::sync::Arc;
 use std::collections::{PriorityQueue, HashSet};
+
+static TASK_NUM: uint = 16;  // 线程数，设为 1 为单线程
 
 type A = u8;
 type Shape = (A, A);
@@ -20,24 +23,40 @@ enum Step {
 }
 
 
-#[deriving(Clone, Eq, PartialEq)]
+#[deriving(Clone)]
 struct Node {
-    matrix: Rc<Matrix>,
+    matrix: Arc<Matrix>,
     shape: Shape,
     center: A,
     value: uint,
-    parent: Option<Rc<Node>>,
+    parent: Option<Arc<Node>>,
     delay: Option<(A, A)>,
     step: Step,
     depth: uint,
 }
 
+impl Eq for Arc<Node> {}
+impl Eq for Node {}
+impl PartialEq for Node {
+    fn eq(&self, _: &Node) -> bool {
+        false
+    }
+}
+impl PartialEq for Arc<Node> {
+    fn eq(&self, _: &Arc<Node>) -> bool {
+        false
+    }
+}
 impl PartialOrd for Node {
     fn lt(&self, other: &Node) -> bool {
         self.value > other.value
     }
 }
-
+impl PartialOrd for Arc<Node> {
+    fn lt(&self, other: &Arc<Node>) -> bool {
+        self.value > other.value
+    }
+}
 impl Ord for Node {
     fn cmp(&self, other: &Node) -> Ordering {
         let result = other.value.cmp(&self.value);
@@ -47,16 +66,20 @@ impl Ord for Node {
         }
     }
 }
-
+impl Ord for Arc<Node> {
+    fn cmp(&self, other: &Arc<Node>) -> Ordering {
+        self.deref().cmp(other.deref())
+    }
+}
 
 
 impl Node {
-    fn new(shape: Shape, matrix: Matrix, center: A) -> Node {
+    fn new(shape: Shape, matrix: Matrix) -> Node {
         let value = valuation(shape, &matrix);
         Node {
-            matrix: Rc::new(matrix),
+            matrix: Arc::new(matrix),
             shape: shape,
-            center: center,
+            center: 0,
             value: value,
             parent: None,
             delay: None,
@@ -81,7 +104,7 @@ fn point_value(shape: Shape, index: int, value: int) -> int {
 }
 
 
-fn swap(parent: Rc<Node>, step: Step) -> Option<Node> {
+fn swap(parent: Arc<Node>, step: Step) -> Option<Node> {
     let center = parent.center;
     let shape = parent.shape;
     let (a, b) = shape;
@@ -118,21 +141,22 @@ fn swap(parent: Rc<Node>, step: Step) -> Option<Node> {
 }
 
 
-fn force(delay_node: Rc<Node>) -> Rc<Node> {
+fn force(delay_node: Arc<Node>) -> Arc<Node> {
     match delay_node.delay {
         None => delay_node,
         Some((a, b)) => {
             let mut matrix = delay_node.matrix.deref().clone();
             let mut node = delay_node.deref().clone();
             matrix.as_mut_slice().swap(a as uint, b as uint);
-            node.matrix = Rc::new(matrix);
+            node.matrix = Arc::new(matrix);
             node.delay = None;
-            Rc::new(node)
+            Arc::new(node)
         }
     }
 }
 
-fn solve_with_node(root: Rc<Node>, max_loop: uint) -> Rc<Node> {
+
+fn solve_with_node(root: Arc<Node>, max_loop: uint) -> Arc<Node> {
     let mut solutions = Vec::new();
     let mut open = PriorityQueue::with_capacity(max_loop);
     let mut close = HashSet::with_capacity(max_loop);
@@ -156,7 +180,7 @@ fn solve_with_node(root: Rc<Node>, max_loop: uint) -> Rc<Node> {
                     close.insert(matrix.clone());
                     for step in [Up, Right, Down, Left].iter() {
                         match swap(node.clone(), *step) {
-                            Some(new) => open.push(Rc::new(new)),
+                            Some(new) => open.push(Arc::new(new)),
                             None => ()
                         }
                     }
@@ -165,7 +189,6 @@ fn solve_with_node(root: Rc<Node>, max_loop: uint) -> Rc<Node> {
         };
     }
     solutions.sort_by(|a, b| b.depth.cmp(&a.depth));
-    println!("solution num {}", solutions.len());
     match solutions.pop() {
         None => fail!("Error solve funtion not solution."),
         Some(solution) => solution,
@@ -173,12 +196,56 @@ fn solve_with_node(root: Rc<Node>, max_loop: uint) -> Rc<Node> {
 }
 
 
-fn solve(shape: Shape, matrix: Matrix, max_selection: uint) -> Node {
-    let max_loop = 10000u;
-    for center in range(matrix.len()) {
-        let root = Rc::new(Node::new(shape, matrix, 0));
-        solve_with_node(root, max_loop).deref().clone()
+fn select(parent: Arc<Node>, center: A) -> Arc<Node> {
+    let mut new = parent.deref().clone();
+    new.step = Select;
+    new.depth += 1;
+    new.center = center;
+    new.parent = Some(parent.clone());
+    Arc::new(new)
+}
+
+
+fn solve_task(node: Arc<Node>, max_loop: uint) -> Arc<Node> {
+    let (tx, rx): (Sender<Option<Arc<Node>>>, Receiver<Option<Arc<Node>>>) = comm::channel();
+    let mut solutions = PriorityQueue::with_capacity(16);
+    let size = node.matrix.len();
+
+    for task_id in range(0, TASK_NUM) {
+        let task_tx = tx.clone();
+        let task_root = node.clone();
+        spawn(proc() {
+            let mut sub_solutions = PriorityQueue::with_capacity(size);
+            for center in range(0, size) {
+                if center % TASK_NUM != task_id {continue};
+                let now = select(task_root.clone(), center as A);
+                sub_solutions.push(solve_with_node(now, max_loop));
+            }
+            task_tx.send(sub_solutions.pop())
+        });
     }
+    for _ in range(0, TASK_NUM) {
+        match rx.recv() {
+            Some(solution) => solutions.push(solution),
+            None => (),
+        }
+    }
+    match solutions.pop() {
+        None => fail!("Out solutions heap empty."),
+        Some(solution) => solution,
+    }
+}
+
+fn solve(shape: Shape, matrix: Matrix, max_selection: uint) -> Node {
+    let max_loop = 50000u;
+    let mut root = Arc::new(Node::new(shape, matrix));
+
+    for select_num in range(0, max_selection) {
+        println!("{:2} SELECTION: value {}", select_num, root.value);
+        if root.value == 0 {break}
+        root = solve_task(root, max_loop);
+    }
+    root.deref().clone()
 }
 
 
@@ -208,18 +275,18 @@ fn get_matrix(shape: Shape) -> Matrix {
     matrix
 }
 
-fn get_pos(shape: Shape, n: A) -> uint {
-    let (_, b) = shape;
-    let x = b as uint;
-    let i = n as uint;
-    (i % x) * 0x10 + (i / x)
-}
+//fn pos(shape: Shape, n: A) -> uint {
+//    let (_, b) = shape;
+//    let x = b as uint;
+//    let i = n as uint;
+//    (i % x) * 0x10 + (i / x)
+//}
 
 fn print_matrix(shape: Shape, matrix: &Matrix) {
     let (_, b) = shape;
     let mut i = 0;
     for x in matrix.iter() {
-        print!(" {:02X}", get_pos(shape, *x));
+        print!(" {:2}", x);
         if (i+1) % b == 0 {print!("\n\n")}
         i += 1;
     }
