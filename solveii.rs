@@ -4,6 +4,7 @@ use std::num::abs;
 use std::comm;
 use std::sync::Arc;
 use std::collections::{PriorityQueue, HashSet};
+use std::io::File;
 
 static TASK_NUM: uint = 16;  // 线程数，设为 1 为单线程
 
@@ -85,6 +86,40 @@ impl Node {
             delay: None,
             step: Start,
             depth: 0,
+        }
+    }
+    fn write_step(&self) {
+        let (_, b) = self.shape;
+        let mut steps = Vec::new();
+        let mut now = self;
+        let mut select_num = 0u;
+        let mut swap_num = 0u;
+        loop {
+            steps.push(match now.step {
+                Select => {
+                    let center = now.center;
+                    let pos = (center % b) * 16 + (center / b);
+                    let now_swap = swap_num;
+                    swap_num = 0;
+                    select_num += 1;
+                    format!("\r\n{:02X}\r\n{}\r\n", pos, now_swap)
+                },
+                Left => {swap_num += 1; "L".to_string()},
+                Right => {swap_num += 1; "R".to_string()},
+                Up => {swap_num += 1; "U".to_string()},
+                Down => {swap_num += 1; "D".to_string()},
+                Start => break,
+            });
+            match now.parent {
+                Some(ref next) => {now = next.deref();},
+                None => fail!("not break???")
+            }
+        }
+        steps.push(format!("{}", select_num));
+        let mut file = File::create(&Path::new("solved.txt"));
+        steps.reverse();
+        for line in steps.iter() {
+            match file.write(line.as_bytes()) {Err(r)=>fail!(r), _=>()};
         }
     }
 }
@@ -303,4 +338,6 @@ fn main() {
     println!("Solution : ");
     print_matrix(shape, solution.matrix.deref());
     println!("depth : {}", solution.depth);
+    println!("Write...");
+    solution.write_step();
 }

@@ -13,9 +13,9 @@ def main(problem_id):
     print("Get Problem...")
     problem_id = input("Input Problem ID (default %s): " % problem_id) or problem_id
     if is_windows:
-        prefix = ".\client.exe"
+        prefix = ".\client.exe "
     else:
-        prefix = "mono ./client"
+        prefix = "mono ./client "
     os.system(prefix + " GetProblem %s %s %s" % (server, problem_id, raw_problem_filename))
     print("Get Problem DONE")
     with open(raw_problem_filename, "rb") as img_file:
