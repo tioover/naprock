@@ -1,9 +1,13 @@
 import os
+import platform
 
 import numpy as np
 
 #from scipy.misc import imresize
 from matplotlib.image import imsave
+
+
+is_windows = platform.system() == "Windows"
 
 
 def grey(image):

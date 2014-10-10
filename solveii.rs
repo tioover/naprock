@@ -13,7 +13,7 @@ type Shape = (A, A);
 type Matrix = Vec<A>;
 
 
-#[deriving(Clone, Eq, PartialEq)]
+#[deriving(Clone)]
 enum Step {
     Start,
     Select,
@@ -36,40 +36,29 @@ struct Node {
     depth: uint,
 }
 
+
 impl Eq for Arc<Node> {}
-impl Eq for Node {}
-impl PartialEq for Node {
-    fn eq(&self, _: &Node) -> bool {
-        false
-    }
-}
+
+
 impl PartialEq for Arc<Node> {
-    fn eq(&self, _: &Arc<Node>) -> bool {
-        false
-    }
+    fn eq(&self, _: &Arc<Node>) -> bool {false}
 }
-impl PartialOrd for Node {
-    fn lt(&self, other: &Node) -> bool {
-        self.value > other.value
-    }
-}
+
+
 impl PartialOrd for Arc<Node> {
-    fn lt(&self, other: &Arc<Node>) -> bool {
-        self.value > other.value
+    fn partial_cmp(&self, other: &Arc<Node>) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
-impl Ord for Node {
-    fn cmp(&self, other: &Node) -> Ordering {
+
+
+impl Ord for Arc<Node> {
+    fn cmp(&self, other: &Arc<Node>) -> Ordering {
         let result = other.value.cmp(&self.value);
         match result {
             Equal => other.depth.cmp(&self.depth),
             _ => result,
         }
-    }
-}
-impl Ord for Arc<Node> {
-    fn cmp(&self, other: &Arc<Node>) -> Ordering {
-        self.deref().cmp(other.deref())
     }
 }
 
@@ -155,8 +144,8 @@ fn swap(parent: Arc<Node>, step: Step) -> Option<Node> {
         Some(shift) => {
             let i1 = center as int;
             let i2 = shift as int;
-            let v1 = *parent.matrix.get(center as uint) as int;
-            let v2 = *parent.matrix.get(shift as uint) as int;
+            let v1 = parent.matrix.deref()[center as uint] as int;
+            let v2 = parent.matrix.deref()[shift as uint] as int;
             let old_value = parent.value as int;
             let new_value = old_value
                 - (point_value(shape, i1, v1) + point_value(shape, i2, v2))
@@ -294,9 +283,9 @@ fn parse() -> (Shape, uint) {
             None => fail!("Command line parse error, can't convert to int"),
         }
     ).collect();
-    let first = *nums.get(0) as A;
-    let second = *nums.get(1) as A;
-    let third = *nums.get(2);
+    let first = nums[0] as A;
+    let second = nums[1] as A;
+    let third = nums[2];
     ((first, second), third)
 }
 
@@ -314,12 +303,6 @@ fn get_matrix() -> Matrix {
     matrix
 }
 
-//fn pos(shape: Shape, n: A) -> uint {
-//    let (_, b) = shape;
-//    let x = b as uint;
-//    let i = n as uint;
-//    (i % x) * 0x10 + (i / x)
-//}
 
 fn print_matrix(shape: Shape, matrix: &Matrix) {
     let (_, b) = shape;

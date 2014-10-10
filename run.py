@@ -4,7 +4,7 @@ import platform
 import matplotlib.image as mpimg
 
 from lib import split_and_save
-from markiii import marker, out
+from write import marker
 from config import player_id, server, raw_problem_filename, solve_filename
 
 
@@ -38,8 +38,7 @@ def main(problem_id):
     print("Restore image")
     redo = "first"
     while redo:
-        blocks, matrices = marker(shape, img)
-        out(shape, blocks, matrices)
+        marker(shape, img)
         redo = input("Redo? (Input any char redo): ")
     print("Done")
     print("========")
