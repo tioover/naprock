@@ -260,8 +260,7 @@ fn solve_task(node: Arc<Node>, max_loop: uint) -> Arc<Node> {
     }
 }
 
-fn solve(shape: Shape, matrix: Matrix, max_selection: uint) -> Node {
-    let max_loop = 50000u;
+fn solve(shape: Shape, matrix: Matrix, max_selection: uint, max_loop: uint) -> Node {
     let mut root = Arc::new(Node::new(shape, matrix));
 
     for select_num in range(0, max_selection) {
@@ -274,7 +273,7 @@ fn solve(shape: Shape, matrix: Matrix, max_selection: uint) -> Node {
 
 
 
-fn parse() -> (Shape, uint) {
+fn parse() -> (Shape, uint, uint) {
     let args: Vec<String> = os::args();
     if args.len() < 4 {fail!("Lack argument.")}
     let nums: Vec<uint> = args.slice(1, args.len()).iter().map(
@@ -286,7 +285,8 @@ fn parse() -> (Shape, uint) {
     let first = nums[0] as A;
     let second = nums[1] as A;
     let third = nums[2];
-    ((first, second), third)
+    let fourth = nums[3];
+    ((first, second), third, fourth)
 }
 
 
@@ -316,12 +316,12 @@ fn print_matrix(shape: Shape, matrix: &Matrix) {
 
 
 fn main() {
-    let (shape, max_selection) = parse();
+    let (shape, max_selection, max_loop) = parse();
     let matrix = get_matrix();
     println!("Input : ")
     print_matrix(shape, &matrix);
     println!("solve...")
-    let solution = solve(shape, matrix, max_selection);
+    let solution = solve(shape, matrix, max_selection, max_loop);
     println!("Solution : ");
     print_matrix(shape, solution.matrix.deref());
     println!("depth : {}", solution.depth);

@@ -62,10 +62,8 @@ def search(shape, blocks):
     print("block entropy is %f , / size is %s" % (raw_entropy, raw_entropy/size))
     while not solutions:
         try:
-            factor = raw_input("Input acceleration factor (default 0.0): ") or 0.0
-            max_loop = raw_input("Input thousand loop number (default 5): ") or 5
-            max_loop, factor = int(max_loop), float(factor)
-            max_loop *= 1000
+            factor = float(raw_input("Input acceleration factor (default 0.0): ") or 0.0)
+            max_loop = int(raw_input("Input thousand loop number (default 5): ") or 5) * 1000
 
             open_list = [(0, [head]) for head in blocks]
             shuffle(open_list)
@@ -93,6 +91,8 @@ def search(shape, blocks):
                         get_value(shape, num+1, new_tail, factor),
                         new_tail,
                     ))
+            if solutions and raw_input("Redo ? Input any char redo : "):
+                continue
         except KeyboardInterrupt:
             break
     return [item[1] for item in solutions]
@@ -111,3 +111,7 @@ def main():
     solutions = list(permutations(blocks)) if len(blocks) <= 9 else search(shape, blocks)
     solutions.sort(key=lambda x: matrix_entropy(shape, x))
     output(blocks, solutions[: 10])
+
+
+if __name__ == '__main__':
+    main()

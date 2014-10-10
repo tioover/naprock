@@ -1,22 +1,20 @@
 import os
-import platform
 
 import matplotlib.image as mpimg
 
-from lib import split_and_save
+from lib import split_and_save, is_windows
 from marker import marker
-from config import player_id, server, raw_problem_filename, solve_filename
+from config import player_id, server, raw_problem_filename
 
 
 def main(problem_id):
-    is_windows = platform.system() == "Windows"
     print("Get Problem...")
     problem_id = input("Input Problem ID (default %s): " % problem_id) or problem_id
     if is_windows:
         prefix = ".\client.exe "
     else:
         prefix = "mono ./client "
-    os.system(prefix + " GetProblem %s %s %s" % (server, problem_id, raw_problem_filename))
+    os.system(prefix + "GetProblem %s %s %s" % (server, problem_id, raw_problem_filename))
     print("Get Problem DONE")
     with open(raw_problem_filename, "rb") as img_file:
         _ = img_file.readline()
@@ -31,26 +29,25 @@ def main(problem_id):
     print("max selection number: ", select_num)
     print("selection cost: ", select_cost, "swap cost: ", swap_cost)
 
-    img = mpimg.imread(raw_problem_filename)
+    image = mpimg.imread(raw_problem_filename)
     print("Split image.")
-    split_and_save(img, shape, os.path.join("exe", "blocks"))
+    split_and_save(image, shape, os.path.join("exe", "blocks"))
+    mpimg.imsave("problem.png", image, dpi=1)
 
     print("Restore image")
-    redo = "first"
-    while redo:
-        marker(shape, img)
-        redo = input("Redo? (Input any char redo): ")
+    marker(shape, image)
     print("Done")
     print("========")
+    max_loop = int(input("Solve max thousand loop  (default 50): ") or "50") * 1000
     input("Are you ready solve? (Press Enter)")
-    if is_windows:
-        os.system(".\solve.exe %d %d %d" % (a, b, select_num))
-    else:
-        os.system("./solve %d %d %d" % (a, b, select_num))
-    print("Done")
+    solve_prefix = ".\solve.exe " if is_windows else "./solve "
+    os.system(solve_prefix + "%d %d %d %d" % (a, b, select_num, max_loop))
+    while input("Redo solve? input any char redo : "):
+        max_loop = int(input("Solve max thousand loop  (default 50): ") or "50") * 1000
+        os.system(solve_prefix + "%d %d %d %d" % (a, b, select_num, max_loop))
     print("Submit Answer")
-    os.system(prefix+"SubmitAnswer %s %s %d %s" % (
-        server, problem_id, player_id, solve_filename))
+    os.system(prefix+"SubmitAnswer %s %s %d solved.txt" % (
+        server, problem_id, player_id))
     print("This problem done. Good luck")
 
 
