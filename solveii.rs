@@ -5,6 +5,7 @@ use std::comm;
 use std::sync::Arc;
 use std::collections::{PriorityQueue, HashSet};
 use std::io::File;
+use std::io::BufferedReader;
 
 static TASK_NUM: uint = 16;  // 线程数，设为 1 为单线程
 
@@ -302,10 +303,14 @@ fn parse() -> (Shape, uint) {
 
 
 fn get_matrix(shape: Shape) -> Matrix {
-	let path = Path::new("marked.txt");
-	let mut file = BufferedReader::new(File::open(&path));
-	let lines: Vec<String> = file.lines().map(|x| x.unwrap()).collect();
-	Vec<A> = lines.iter().map(|x| str_int(x) as A).collect();
+    let path = Path::new("marked.txt");
+    let mut file = BufferedReader::new(File::open(&path));
+    let lines: Vec<String> = file.lines().map(|x| x.unwrap()).collect();
+    Vec<A> = lines.iter().map(
+        |x| match from_str(x.as_slice().trim()) {
+            Some(n) => n,
+            None => fail!("File parse error, can't convert to int"),
+        }).collect();
 }
 
 //fn pos(shape: Shape, n: A) -> uint {
