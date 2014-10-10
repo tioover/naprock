@@ -302,12 +302,10 @@ fn parse() -> (Shape, uint) {
 
 
 fn get_matrix(shape: Shape) -> Matrix {
-    let (x, y) = shape;
-    let size = x as uint * y as uint;
-    let mut matrix = Vec::from_fn(size, |id| id as A);
-    task_rng().shuffle(matrix.as_mut_slice());
-    matrix.shrink_to_fit();
-    matrix
+	let path = Path::new("marked.txt");
+	let mut file = BufferedReader::new(File::open(&path));
+	let lines: Vec<String> = file.lines().map(|x| x.unwrap()).collect();
+	Vec<A> = lines.iter().map(|x| str_int(x) as A).collect();
 }
 
 //fn pos(shape: Shape, n: A) -> uint {
