@@ -69,43 +69,6 @@ class Block:
         return True
 
 
-def get_threshold(f, blocks):
-    diff_list = []
-    grad_list = []
-
-    for base in blocks:
-        base_diff_list = [base.get_cache(f, block) for block in blocks]
-        base_diff_list.sort()
-        diff_list.append(base_diff_list[0])
-        grad_list.append(base_diff_list[1]-base_diff_list[0])
-    diff_list.sort()
-    grad_list.sort()
-    threshold = sum(diff_list)/len(diff_list)
-    grad = grad_list[len(grad_list)//2]
-    print(diff_list)
-    print("threshold: ", threshold)
-    print(grad_list)
-    print("grad: ", grad)
-    print("----")
-    return threshold
-
-
-def search(f, base, blocks, threshold=None):
-    threshold = threshold or get_threshold(f, blocks)
-    result = []
-    for block in blocks:
-        if base is block:
-            continue
-        value = base.get_cache(f, block)
-        result.append((value, block))
-
-    result.sort(key=lambda x: x[0])
-    if result[0][0] < threshold and result[1][0] - result[0][0] > threshold / 4:
-        return result[0][1]
-    else:
-        return None
-
-
 def matrix_entropy(shape, matrix):
     a, b = shape
     length = len(matrix)
@@ -120,23 +83,6 @@ def matrix_entropy(shape, matrix):
         if bottom_block and i+1 < a:
             entropy += block.get_cache(bottom, matrix[bottom_index])
         if right_block and j+1 < b:
-            entropy += block.get_cache(right, matrix[right_index])
-    return entropy / length
-
-
-def new_entropy(shape, matrix):
-    a, b = shape
-    length = len(matrix)
-    entropy = 0
-    for index, block in enumerate(matrix):
-        right_index = index+1
-        right_block = matrix[right_index] if right_index < length else None
-        bottom_index = index+b
-        bottom_block = matrix[bottom_index] if bottom_index < length else None
-
-        if bottom_block:
-            entropy += block.get_cache(bottom, matrix[bottom_index])
-        if right_block:
             entropy += block.get_cache(right, matrix[right_index])
     return entropy / length
 
@@ -156,70 +102,50 @@ def state_search(shape, blocks):
     a, b = shape
     size = a*b
     solutions = []
+    raw_entropy = matrix_entropy(shape, blocks)
+    print("block entropy is %f , / size is %s" % (raw_entropy, raw_entropy/size))
     while not solutions:
-        factor = input("Input acceleration factor (default 0.0): ") or 0.0
-        max_loop = input("Input max loop number (default 5000): ") or 5000
-        max_loop, factor = int(max_loop), float(factor)
+        try:
+            factor = input("Input acceleration factor (default 0.0): ") or 0.0
+            max_loop = input("Input thousand loop number (default 5): ") or 5
+            max_loop, factor = int(max_loop), float(factor)
+            max_loop *= 1000
 
-        open_list = [(0, [head]) for head in blocks]
-        shuffle(open_list)
-        percentage = max_loop // 100
+            open_list = [(0, [head]) for head in blocks]
+            shuffle(open_list)
+            percentage = max_loop // 100
 
-        for loop_num in range(max_loop):
-            if not open_list:
-                break
-            if len(open_list) > max_loop * 2:
-                open_list = open_list[: max_loop]
-            value, matrix = heappop(open_list)
-            num = len(matrix)
-            if loop_num % percentage == 0:
-                print("%2d %% VALUE: %f" % (loop_num // percentage, value))
-            if num == size:
-                heappush(solutions, (value, matrix))
-                print("A SOLUTION")
-                continue
-            for new_block in blocks:
-                if new_block in matrix:
+            for loop_num in range(max_loop):
+                if not open_list:
+                    break
+                if len(open_list) > max_loop * 2:
+                    open_list = open_list[: max_loop]
+                value, matrix = heappop(open_list)
+                num = len(matrix)
+                if loop_num % percentage == 0:
+                    print("%2d %% VALUE: %f" % (loop_num // percentage, value))
+                if num == size:
+                    heappush(solutions, (value, matrix))
+                    print("A SOLUTION")
                     continue
-                # new_front = matrix.copy()
-                new_tail = matrix.copy()
-                # new_front.insert(0, new_block)
-                new_tail.append(new_block)
-                # heappush(open_list, (
-                #     get_value(shape, num+1, new_front, factor),
-                #     new_front,
-                # ))
-                heappush(open_list, (
-                    get_value(shape, num+1, new_tail, factor),
-                    new_tail,
-                ))
+                for new_block in blocks:
+                    if new_block in matrix:
+                        continue
+                    new_tail = matrix.copy()
+                    new_tail.append(new_block)
+                    heappush(open_list, (
+                        get_value(shape, num+1, new_tail, factor),
+                        new_tail,
+                    ))
+        except KeyboardInterrupt:
+            break
 
     solutions.sort(key=lambda x: x[0])
     return [item[1] for item in solutions]
 
 
-def solution_eq(a, b):
-    for x, y in zip(a, b):
-        if x is not y:
-            return False
-    return True
-
-
 def block_link(blocks):
-    bottom_threshold = get_threshold(bottom, blocks)
-    right_threshold = get_threshold(right, blocks)
-
-    for block in blocks:
-        if block.bottom is None:
-            bottom_block = search(
-                bottom, block, blocks, threshold=bottom_threshold)
-            if bottom_block is not None:
-                block.bottom = bottom_block
-        if block.right is None:
-            right_block = search(
-                right, block, blocks, threshold=right_threshold)
-            if right_block is not None:
-                block.right = right_block
+    pass
 
 
 def set_cache(blocks):
@@ -305,8 +231,7 @@ def out(shape, blocks, solves):
 
 def main():
     import sys
-    a = int(sys.argv[1])
-    b = int(sys.argv[2])
+    a, b = int(sys.argv[1]), int(sys.argv[2])
     shape = a, b
     image = mpimg.imread("problem.png")
     blocks, matrices = marker(shape, image)

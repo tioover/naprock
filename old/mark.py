@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
-import matplotlib.image as mpimg
 from random import shuffle
 from lib import grey, split, image_matrix
-from PIL import Image
-import matplotlib.cm as cm
 
 
 class Block:
@@ -274,40 +271,9 @@ def matrix_map(shape, image, matrix):
     return a_map
 
 
-def write_map(shape, map_ref):
-    a, b = shape
-    convert = lambda x: x[0]*b+x[1]
-    map_list = [i for i in range(a*b)]
-
-    for x in map_ref:
-        y = map_ref[x]
-        m, n = convert(x), convert(y)
-        if m > len(map_list) or n in map_list:
-            continue
-        map_list[m] = n
-
-    marked = set(map_list)
-    unmarked = list({i for i in range(a*b)} - marked)
-
-    with open("exe\in.txt", "w") as f:
-        f.writelines("%d %d\n" % shape)
-        for index in map_list:
-            if index is None:
-                index = unmarked.pop()
-            f.writelines("%d\n" % index)
-
-    return map_list
-
-
-def mark(filename="problem.png", shape=(10, 10)):
-    import os
-    from scipy.misc import imresize
-    image = grey(mpimg.imread(filename))
+def marker(shape, img):
+    image = grey(img)
     pieces = split(image, shape)
-    os.system("rm *.png")
-    for i, piece in enumerate(pieces):
-        w, h = piece.shape
-        mpimg.imsave("exe/%d.png" % i, imresize(piece, 20))
     blocks = list(map(Block, pieces))
     good_mark(blocks)
     matrices, unmarked = make_matrix(shape, blocks)
@@ -315,25 +281,3 @@ def mark(filename="problem.png", shape=(10, 10)):
     shuffle(loops_)
     matrix = max_matrix(matrices)
     return matrix, matrix_map(shape, image, matrix)
-
-
-def main():
-    import sys
-    filename = "problem.png"
-    a, b = 10, 10
-    if len(sys.argv) == 3:
-        a = int(sys.argv[1])
-        b = int(sys.argv[2])
-    elif len(sys.argv) == 4:
-        filename = sys.argv[1]
-        a = int(sys.argv[2])
-        b = int(sys.argv[3])
-    shape = (a, b)
-    matrix, map_ = mark(filename, (a, b))
-    image = make_image(matrix)
-    mpimg.imsave("out.png", image, dpi=1, cmap=cm.Greys_r)
-    write_map(shape, map_)
-
-
-if __name__ == '__main__':
-    main()
