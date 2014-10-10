@@ -1,10 +1,10 @@
 use std::os;
-use std::rand::{task_rng, Rng};
 use std::num::abs;
 use std::comm;
 use std::sync::Arc;
 use std::collections::{PriorityQueue, HashSet};
 use std::io::File;
+use std::io::BufferedReader;
 
 static TASK_NUM: uint = 16;  // 线程数，设为 1 为单线程
 
@@ -301,11 +301,17 @@ fn parse() -> (Shape, uint) {
 }
 
 
-fn get_matrix(shape: Shape) -> Matrix {
+fn get_matrix() -> Matrix {
     let path = Path::new("marked.txt");
     let mut file = BufferedReader::new(File::open(&path));
     let lines: Vec<String> = file.lines().map(|x| x.unwrap()).collect();
-    lines.iter().map(|x| str_int(x) as A).collect();
+    let matrix: Matrix = lines.iter().map(
+        |x| match from_str(x.as_slice().trim()) {
+            Some(n) => n,
+            None => fail!("File parse error, can't convert to int"),
+        }
+    ).collect();
+    matrix
 }
 
 //fn pos(shape: Shape, n: A) -> uint {
@@ -328,7 +334,7 @@ fn print_matrix(shape: Shape, matrix: &Matrix) {
 
 fn main() {
     let (shape, max_selection) = parse();
-    let matrix = get_matrix(shape);
+    let matrix = get_matrix();
     println!("Input : ")
     print_matrix(shape, &matrix);
     println!("solve...")
