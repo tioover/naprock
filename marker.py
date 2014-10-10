@@ -59,6 +59,18 @@ def output(shape, blocks, solutions):
             dpi=1,
             cmap=Greys_r,
         )
+    solution = solutions[int(input("Choose a solve (default 0): ") or 0)]
+
+    solve_map = [solution.index(block) for block in blocks]
+    exe_map = [blocks.index(block) for block in solution]
+
+    with open(join("exe", "in.txt"), "w") as exe_input:
+        exe_input.writelines("%d %d\n" % shape)
+        for i in exe_map:
+            exe_input.writelines("%d\n" % i)
+    with open("marked.txt", "w") as solve_input:
+        for i in solve_map:
+            solve_input.writelines("%d\n" % i)
 
 
 def marker(shape, image):
@@ -72,7 +84,3 @@ def marker(shape, image):
             json.loads(solutions_file.read())
         ))
     output(shape, blocks, solutions)
-
-
-if __name__ == '__main__':
-    main()

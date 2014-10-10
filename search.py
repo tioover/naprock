@@ -111,7 +111,3 @@ def main():
     solutions = list(permutations(blocks)) if len(blocks) <= 9 else search(shape, blocks)
     solutions.sort(key=lambda x: matrix_entropy(shape, x))
     output(blocks, solutions[: 10])
-
-
-if __name__ == '__main__':
-    main()

@@ -4,7 +4,7 @@ import platform
 import matplotlib.image as mpimg
 
 from lib import split_and_save
-from write import marker
+from marker import marker
 from config import player_id, server, raw_problem_filename, solve_filename
 
 
