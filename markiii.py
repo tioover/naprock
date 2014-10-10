@@ -108,48 +108,37 @@ def search(f, base, blocks, threshold=None):
 
 def matrix_entropy(shape, matrix):
     a, b = shape
+    length = len(matrix)
     entropy = 0
-    size = len(matrix)
     for index, block in enumerate(matrix):
         i, j = index // a, index % a
-        right_i = index+1
-        bottom_i = index+b
+        right_index = index+1
+        right_block = matrix[right_index] if right_index < length else None
+        bottom_index = index+b
+        bottom_block = matrix[bottom_index] if bottom_index < length else None
 
-        if bottom_i < size and i+1 < a and matrix[bottom_i]:
-            value = block.get_cache(bottom, matrix[bottom_i])
-            entropy += value
-        if right_i < size and j+1 < b and matrix[right_i]:
-            value = block.get_cache(right, matrix[right_i])
-            entropy += value
-    return entropy / size
+        if bottom_block and i+1 < a:
+            entropy += block.get_cache(bottom, matrix[bottom_index])
+        if right_block and j+1 < b:
+            entropy += block.get_cache(right, matrix[right_index])
+    return entropy / length
 
 
 def new_entropy(shape, matrix):
     a, b = shape
-    size = a*b
     length = len(matrix)
-    min_entropy = float('inf')
+    entropy = 0
+    for index, block in enumerate(matrix):
+        right_index = index+1
+        right_block = matrix[right_index] if right_index < length else None
+        bottom_index = index+b
+        bottom_block = matrix[bottom_index] if bottom_index < length else None
 
-    for shift in range(b):
-        if shift + length > size:
-            break
-        entropy = 0
-        for index, block in enumerate(matrix):
-            index += shift
-            i, j = index // a, index % a
-            right_index = index-shift+1
-            bottom_index = index-shift+b
-            right_block = matrix[right_index] if right_index < length else None
-            bottom_block = matrix[bottom_index] if bottom_index < length else None
-
-            if bottom_block and i+1 < a:
-                entropy += block.get_cache(bottom, bottom_block)
-            if right_block and j+1 < b:
-                entropy += block.get_cache(right, right_block)
-        if entropy < min_entropy:
-            min_entropy = entropy
-
-    return min_entropy
+        if bottom_block:
+            entropy += block.get_cache(bottom, matrix[bottom_index])
+        if right_block:
+            entropy += block.get_cache(right, matrix[right_index])
+    return entropy / length
 
 
 diff_min = lambda x: min(x.items(), key=lambda y: y[1])[0]
@@ -169,7 +158,7 @@ def state_search(shape, blocks):
     solutions = []
     while not solutions:
         factor = input("Input acceleration factor (default 0.0): ") or 0.0
-        max_loop = input("Input max loop number (default 50000): ") or 50000
+        max_loop = input("Input max loop number (default 5000): ") or 5000
         max_loop, factor = int(max_loop), float(factor)
 
         open_list = [(0, [head]) for head in blocks]
@@ -192,28 +181,21 @@ def state_search(shape, blocks):
             for new_block in blocks:
                 if new_block in matrix:
                     continue
-                new_front = matrix.copy()
+                # new_front = matrix.copy()
                 new_tail = matrix.copy()
-                new_front.insert(0, new_block)
+                # new_front.insert(0, new_block)
                 new_tail.append(new_block)
-                heappush(open_list, (
-                    get_value(shape, num+1, new_front, factor),
-                    new_front,
-                ))
+                # heappush(open_list, (
+                #     get_value(shape, num+1, new_front, factor),
+                #     new_front,
+                # ))
                 heappush(open_list, (
                     get_value(shape, num+1, new_tail, factor),
                     new_tail,
                 ))
 
     solutions.sort(key=lambda x: x[0])
-    unique_solutions = [solutions.pop(0)]
-    for m in solutions:
-        for n in unique_solutions:
-            if m[0] == n[0] and solution_eq(m[1], n[1]):
-                break
-        else:
-            unique_solutions.append(m)
-    return [item[1] for item in unique_solutions]
+    return [item[1] for item in solutions]
 
 
 def solution_eq(a, b):
