@@ -6,9 +6,8 @@ from os.path import join
 import numpy
 
 from matplotlib.image import imsave
-from matplotlib.cm import Greys_r
 
-from lib import split, grey, is_windows
+from lib import split, grey, remove
 
 
 class Block(object):
@@ -36,8 +35,8 @@ def write(pieces):
 def matrix_to_image(shape, matrix):
     piece = matrix[0].img
     a, b = shape
-    m, n, o = piece.shape
-    image = numpy.ndarray((m*a, n*b, o), dtype=piece.dtype)
+    m, n = piece.shape
+    image = numpy.ndarray((m*a, n*b))
     for index, block in enumerate(matrix):
         piece = block.img
         i = index // b
@@ -46,21 +45,19 @@ def matrix_to_image(shape, matrix):
     return image
 
 
-def output(shape, blocks, solutions):
-    if is_windows:
-        os.system("del preview\*.png")
-    else:
-        os.system("rm preview/*.png")
+def preview(shape, solutions):
+    remove("preview", "*.png")
 
     for num, solution in enumerate(solutions):
         imsave(
             fname=join("preview", "%d.png" % num),
             arr=matrix_to_image(shape, solution),
             dpi=1,
-            cmap=Greys_r,
         )
-    solution = solutions[int(input("Choose a solve (default 0): ") or 0)]
 
+
+def output(shape, blocks, solutions):
+    solution = solutions[int(input("Choose a solve (default 0): ") or 0)]
     solve_map = [solution.index(block) for block in blocks]
     exe_map = [blocks.index(block) for block in solution]
 
@@ -74,13 +71,18 @@ def output(shape, blocks, solutions):
 
 
 def marker(shape, image):
-    pieces = split(image, shape)
+    pieces = split(shape, grey(image))
     blocks = list(map(Block, pieces))
-    write(list(map(grey, pieces)))
-    os.system("pypy search.py %d %d" % shape)
-    with open("mark_solutions.json") as solutions_file:
-        solutions = list(map(
-            lambda solution: list(map(lambda i: blocks[i], solution)),
-            json.loads(solutions_file.read())
-        ))
+    write(pieces)
+    solutions = []
+    while True:
+        os.system("pypy search.py %d %d" % shape)
+        with open("mark_solutions.json") as solutions_file:
+            solutions = list(map(
+                lambda solution: list(map(lambda i: blocks[i], solution)),
+                json.loads(solutions_file.read())
+            ))
+        preview(shape, solutions)
+        if not input("Redo ? Input any char redo : "):
+            break
     output(shape, blocks, solutions)

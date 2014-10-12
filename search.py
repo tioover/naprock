@@ -1,3 +1,7 @@
+"""
+Run in PyPy 2
+"""
+
 import sys
 import json
 
@@ -91,8 +95,6 @@ def search(shape, blocks):
                         get_value(shape, num+1, new_tail, factor),
                         new_tail,
                     ))
-            if solutions and raw_input("Redo ? Input any char redo : "):
-                continue
         except KeyboardInterrupt:
             break
     return [item[1] for item in solutions]
