@@ -48,7 +48,7 @@ def main(problem_id):
         if not input("Redo solve? input any char redo : "):
             break
     print("Submit Answer")
-    os.system(prefix+"SubmitAnswer %s %s %d solved.txt" % (
+    os.system(prefix+"SubmitAnswer %s %s %s solved.txt" % (
         server, problem_id, player_id))
     print("This problem done. Good luck")
 

@@ -1,10 +1,8 @@
 import os
 import json
-
 from os.path import join
 
 import numpy
-
 from matplotlib.image import imsave
 
 from lib import split, grey, remove
@@ -13,7 +11,6 @@ from lib import split, grey, remove
 class Block(object):
     def __init__(self, piece):
         self.img = piece
-
 
 diff = lambda a, b: numpy.sum(numpy.fabs(a-b))
 top = lambda a, b: diff(a[0], b[-1])

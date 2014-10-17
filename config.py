@@ -1,3 +1,3 @@
-player_id = 5
-server = "10.98.58.59"
+player_id = ""
+server = "172.16.1.2"
 raw_problem_filename = "raw_problem.ppm"

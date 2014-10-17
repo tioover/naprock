@@ -67,7 +67,7 @@ def search(shape, blocks):
     while not solutions:
         try:
             factor = float(raw_input("Input acceleration factor (default 0.0): ") or 0.0)
-            max_loop = int(raw_input("Input thousand loop number (default 5): ") or 5) * 1000
+            max_loop = int(raw_input("Input thousand loop number (default 50): ") or 50) * 1000
 
             open_list = [(0, [head]) for head in blocks]
             shuffle(open_list)
