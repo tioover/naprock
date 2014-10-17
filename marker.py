@@ -12,6 +12,7 @@ class Block(object):
     def __init__(self, piece):
         self.img = piece
 
+
 diff = lambda a, b: numpy.sum(numpy.fabs(a-b))
 top = lambda a, b: diff(a[0], b[-1])
 bottom = lambda a, b: diff(a[-1], b[0])

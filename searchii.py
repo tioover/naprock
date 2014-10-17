@@ -20,14 +20,19 @@ class Block(object):
 
 def matrix_entropy(shape, matrix):
     a, b = shape
-    length = len(matrix)
+    size = len(matrix)
     entropy = 0
+    length = 0
     for index, block in enumerate(matrix):
+        if matrix[index] is not None:
+            length += 1
+        else:
+            continue
         i, j = index // a, index % a
         right_index = index+1
-        right_block = matrix[right_index] if right_index < length else None
+        right_block = matrix[right_index] if right_index < size else None
         bottom_index = index+b
-        bottom_block = matrix[bottom_index] if bottom_index < length else None
+        bottom_block = matrix[bottom_index] if bottom_index < size else None
 
         if bottom_block and i+1 < a:
             entropy += block.bottom[matrix[bottom_index]]
@@ -69,7 +74,11 @@ def search(shape, blocks):
             factor = float(raw_input("Input acceleration factor (default 0.0): ") or 0.0)
             max_loop = int(raw_input("Input thousand loop number (default 50): ") or 50) * 1000
 
-            open_list = [(0, [head]) for head in blocks]
+            open_list = []
+            for head in blocks:
+                matrix = [None for _ in range(size)]
+                matrix[0] = head
+                open_list.append((0, 1, matrix))
             shuffle(open_list)
             percentage = max_loop // 100
 
@@ -78,8 +87,7 @@ def search(shape, blocks):
                     break
                 if len(open_list) > max_loop * 2:
                     open_list = open_list[: max_loop]
-                value, matrix = heappop(open_list)
-                num = len(matrix)
+                value, num, matrix = heappop(open_list)
                 if loop_num % percentage == 0:
                     print("%2d %% VALUE: %f" % (loop_num // percentage, value))
                 if num == size:
@@ -90,41 +98,27 @@ def search(shape, blocks):
                     if new_block in matrix:
                         continue
                     new_tail = matrix[:]
-                    new_tail.append(new_block)
+                    line_index = num // b
+                    if line_index % 2 == 0:
+                        index = num
+                    else:
+                        index = line_index * b + b - (num % b) - 1
+                    try:
+                        new_tail[index] = new_block
+                    except Exception as e:
+                        print(index)
+                        print(num)
+                        print(len(new_tail))
+                        print(size)
+                        raise e
                     heappush(open_list, (
                         get_value(shape, num+1, new_tail, factor),
+                        num+1,
                         new_tail,
                     ))
         except KeyboardInterrupt:
             break
     return [item[1] for item in solutions]
-
-
-def improve(shape, matrix, max_loop=10000):
-    a, b = shape
-    size = a * b
-    value = matrix_entropy(shape, matrix)
-    open_list = [(matrix_entropy(shape, matrix), matrix)]
-    close = set()
-    min_value = value
-    min_matrix = matrix
-    for _ in range(max_loop):
-        item = heappop(open_list)
-        value, matrix = item
-        if value in close:
-            continue
-        else:
-            close.add(value)
-        if value < min_value:
-            min_matrix = matrix
-        for i in range(size):
-            for j in range(size):
-                if i == j:
-                    continue
-                new = matrix[:]
-                new[i], new[j] = new[j], new[i]
-                heappush(open_list, (matrix_entropy(shape, new), new))
-    return min_matrix
 
 
 def output(blocks, solutions):
@@ -139,10 +133,6 @@ def main():
     blocks = make_blocks()
     solutions = list(permutations(blocks)) if len(blocks) <= 9 else search(shape, blocks)
     solutions.sort(key=lambda x: matrix_entropy(shape, x))
-    improve_loop = int(raw_input("Input improve passage thousand loop number (default 0): ") or 0) * 1000
-    if improve_loop != 0:
-        solutions.append(improve(shape, solutions[0]))
-        solutions.sort(key=lambda x: matrix_entropy(shape, x))
     output(blocks, solutions[: 10])
 
 
