@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from os.path import join
 
 import numpy
@@ -54,7 +55,7 @@ def preview(shape, solutions):
         )
     from lib import is_windows
     if is_windows:
-        os.system("preview\\0.png")
+        subprocess.call("preview\\0.png")
 
 
 def output(shape, blocks, solutions):
