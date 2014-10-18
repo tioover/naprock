@@ -40,7 +40,7 @@ def make_blocks():
     with open("diff.json") as diff_file:
         diff_dct_list = json.loads(diff_file.read())
 
-    blocks = [Block() for _ in range(len(diff_dct_list))]
+    blocks = [Block() for _ in xrange(len(diff_dct_list))]
 
     for index, empty_block in enumerate(blocks):
         empty_block.top = {block: diff for block, diff in zip(blocks, diff_dct_list[index]['top'])}
@@ -73,14 +73,15 @@ def search(shape, blocks):
             shuffle(open_list)
             percentage = max_loop // 100
 
-            for loop_num in range(max_loop):
+            for loop_num in xrange(max_loop):
                 if not open_list:
                     break
                 if len(open_list) > max_loop * 2:
                     open_list = open_list[: max_loop]
                 value, matrix = heappop(open_list)
                 num = len(matrix)
-                if loop_num % percentage == 0:
+                in_percentage = loop_num % percentage == 0
+                if in_percentage:
                     print("%2d %% VALUE: %f" % (loop_num // percentage, value))
                 if num == size:
                     heappush(solutions, (value, matrix))
@@ -100,15 +101,15 @@ def search(shape, blocks):
     return [item[1] for item in solutions]
 
 
-def improve(shape, matrix, max_loop=10000):
+def improve(shape, matrix, max_loop):
     a, b = shape
     size = a * b
     value = matrix_entropy(shape, matrix)
-    open_list = [(matrix_entropy(shape, matrix), matrix)]
+    open_list = [(value, matrix)]
     close = set()
     min_value = value
     min_matrix = matrix
-    for _ in range(max_loop):
+    for _ in xrange(max_loop):
         item = heappop(open_list)
         value, matrix = item
         if value in close:
@@ -117,8 +118,8 @@ def improve(shape, matrix, max_loop=10000):
             close.add(value)
         if value < min_value:
             min_matrix = matrix
-        for i in range(size):
-            for j in range(size):
+        for i in xrange(size):
+            for j in xrange(size):
                 if i == j:
                     continue
                 new = matrix[:]
@@ -141,7 +142,7 @@ def main():
     solutions.sort(key=lambda x: matrix_entropy(shape, x))
     improve_loop = int(raw_input("Input improve passage thousand loop number (default 0): ") or 0) * 1000
     if improve_loop != 0:
-        solutions.append(improve(shape, solutions[0]))
+        solutions.append(improve(shape, solutions[0], improve_loop))
         solutions.sort(key=lambda x: matrix_entropy(shape, x))
     output(blocks, solutions[: 10])
 

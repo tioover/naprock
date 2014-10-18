@@ -55,4 +55,4 @@ def main(problem_id):
 
 if __name__ == '__main__':
     for n in range(1000):
-        main(str(n))
+        main(str(n+1))

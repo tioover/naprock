@@ -52,6 +52,9 @@ def preview(shape, solutions):
             arr=matrix_to_image(shape, solution),
             dpi=1,
         )
+    from lib import is_windows
+    if is_windows:
+        os.system("preview\\0.png")
 
 
 def output(shape, blocks, solutions):
