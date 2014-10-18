@@ -3,7 +3,7 @@ import os
 import matplotlib.image as mpimg
 
 from lib import split_and_save, is_windows, remove
-from marker import marker
+from mark import marker
 from config import player_id, server, raw_problem_filename
 
 
@@ -42,7 +42,6 @@ def main(problem_id):
     print("========")
     while True:
         max_loop = int(input("Solve max thousand loop  (default 50): ") or "50") * 1000
-        input("Are you ready solve? (Press Enter)")
         solve_prefix = ".\solve.exe " if is_windows else "./solve "
         os.system(solve_prefix + "%d %d %d %d" % (a, b, select_num, max_loop))
         if not input("Redo solve? input any char redo : "):

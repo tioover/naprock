@@ -1,7 +1,12 @@
-#!/usr/bin/env python3
-import numpy as np
 from random import shuffle
-from lib import grey, split
+from heapq import heappop, heappush
+from itertools import permutations
+
+import numpy
+from matplotlib.image import imsave
+from os.path import join
+
+from lib import grey, split, remove, is_windows
 
 
 class Block:
@@ -13,6 +18,9 @@ class Block:
         self.right = None
         self.marked = False
         self.cache = dict()
+
+    def __lt__(self, _):
+        return True
 
 
 class Reference:
@@ -36,10 +44,10 @@ class Reference:
     @staticmethod
     def line_compare(a, b) -> float:
         l = a[1: -1]
-        return np.sum(np.minimum(np.minimum(
-            np.fabs(l - b[0: -2]),
-            np.fabs(l - b[1: -1])),
-            np.fabs(l - b[2:])))
+        return numpy.sum(numpy.minimum(numpy.minimum(
+            numpy.fabs(l - b[0: -2]),
+            numpy.fabs(l - b[1: -1])),
+            numpy.fabs(l - b[2:])))
 
     @staticmethod
     def get_line(x):
@@ -89,13 +97,13 @@ class Right(Reference):
         return x[..., -1]
 
 
-def reverse(a, b):
+def reverse_ref(a, b):
     a.reverse = b
     b.reverse = a
 
 
-reverse(Top, Bottom)
-reverse(Left, Right)
+reverse_ref(Top, Bottom)
+reverse_ref(Left, Right)
 
 
 loop0 = (Top, Right, Bottom, Left)
@@ -160,74 +168,138 @@ def good_mark(blocks):
 
 def make_matrix(shape, blocks):
     a, b = shape
-    m, n = a*4, b*4
-    result = []
-    matrices = []
-    unmarked = set()
-    close = set()
+    size = a * b
 
-    for block in blocks:
-        if not block or block in close:
-            continue
-        a_min, a_max, b_min, b_max = m, 0, n, 0
-        matrix = np.zeros((m, n))
-        open_table = [(block, (m//2, n//2))]
-        while open_table:
-            block, shift = open_table.pop()
-            if not block or block in close:
-                continue
-            close.add(block)
-            i, j = shift
-            matrix[i, j] = block
+    solutions = set()
+    for index in range(size):
+        for block in blocks:
+            matrix = [None for _ in range(size)]
+            open_list = [(block, index)]
+            close = set()
 
-            a_min = i if i < a_min else a_min
-            a_max = i if i > a_max else a_max
-            b_min = j if j < b_min else b_min
-            b_max = j if j > b_max else b_max
-
-            open_table.append((block.top, (i-1, j)))
-            open_table.append((block.right, (i, j+1)))
-            open_table.append((block.bottom, (i+1, j)))
-            open_table.append((block.left, (i, j-1)))
-        result.append(matrix[a_min: a_max+1, b_min: b_max+1])
-
-    for matrix in result:
-        if matrix.shape == (1, 1):
-            unmarked.add(matrix[0, 0])
-        else:
-            matrices.append(matrix)
-    return matrices
-
-
-def max_matrix(matrices):
+            while open_list:
+                block, index = open_list.pop()
+                if block in close:
+                    continue
+                close.add(block)
+                matrix[index] = block
+                i, j = index // b, index % b
+                top_block = block.top
+                bottom_block = block.bottom
+                left_block = block.left
+                right_block = block.right
+                if top_block and i != 0:
+                    open_list.append((top_block, index-b))
+                if bottom_block and i + 1 != a:
+                    open_list.append((bottom_block, index+b))
+                if right_block and j + 1 != b:
+                    open_list.append((right_block, index+1))
+                if left_block and j != 0:
+                    open_list.append((left_block, index-1))
+            solutions.add(tuple(matrix))
     maximum = 0
-    mat = None
-    for matrix in matrices:
-        a, b = matrix.shape
-        now = a*b
-        if now > maximum:
-            maximum = now
-            mat = matrix
-    return mat
+    max_solutions = []
 
-
-def first_block(matrix):
-    for line in matrix:
-        for block in line:
+    for solution in solutions:
+        num = 0
+        for block in solution:
             if block:
-                return block
+                num += 1
+        if num > maximum:
+            maximum = num
+            max_solutions = [solution]
+        elif num == maximum:
+            max_solutions.append(solution)
+    return max_solutions
 
 
-def make_image(matrix):
-    piece = first_block(matrix).piece
-    a, b = piece.shape
-    m, n = matrix.shape
-    image = np.zeros((m*a, n*b))
-    for i, line in enumerate(matrix):
-        for j, block in enumerate(line):
-            if block:
-                image[a*i: a*i+a, b*j: b*j+b] = block.piece
+def matrix_to_image(shape, matrix):
+    piece = None
+    for block in matrix:
+        if block:
+            piece = block.piece
+    a, b = shape
+    m, n = piece.shape
+    image = numpy.zeros((m*a, n*b))
+    for index, block in enumerate(matrix):
+        if block is None:
+            continue
+        piece = block.piece
+        i = index // b
+        j = index % b
+        image[m*i: m*i+m, n*j: n*j+n] = piece
     return image
+
+
+def matrix_entropy(shape, matrix):
+    a, b = shape
+    size = a * b
+    length = 0
+    entropy = 0
+    for index, block in enumerate(matrix):
+        if not block:
+            continue
+        length += 1
+        i, j = index // a, index % a
+        right_index = index+1
+        right_block = matrix[right_index] if right_index < size else None
+        bottom_index = index+b
+        bottom_block = matrix[bottom_index] if bottom_index < size else None
+
+        if bottom_block and i+1 < a:
+            entropy += block.cache[(Bottom, bottom_block)]
+        if right_block and j+1 < b:
+            entropy += block.cache[(Right, right_block)]
+    return entropy / length
+
+
+def preview(shape, solutions):
+    import os
+    remove("preview", "*.png")
+    for i, solution in enumerate(solutions):
+        image = matrix_to_image(shape, solution)
+        imsave(os.path.join("preview", "%d.png" % i), image)
+    if is_windows:
+        os.system("preview\\0.png")
+
+
+def fill(shape, blocks, solution, vertical=False):
+    a, b = shape
+    size = a * b
+    unmarked = set(set(blocks) - set(solution))
+    if not unmarked:
+        return solution
+    solution = list(solution)
+    for _ in range(10):
+        for index in range(size):
+            i, j = index // b, index % b
+            if vertical:
+                if i + 1 != a and solution[index] and solution[index+b] is None:
+                    solution[index+b] = search(unmarked, solution[index], Bottom).y
+                    unmarked.remove(solution[index+b])
+                if i != 0 and solution[index] and solution[index-b] is None:
+                    solution[index-b] = search(unmarked, solution[index], Top).y
+                    unmarked.remove(solution[index-b])
+            if j + 1 != b and solution[index] and solution[index+1] is None:
+                solution[index+1] = search(unmarked, solution[index], Right).y
+                unmarked.remove(solution[index+1])
+            if j != 0 and solution[index] and solution[index-1] is None:
+                solution[index-1] = search(unmarked, solution[index], Left).y
+                unmarked.remove(solution[index-1])
+    return solution
+
+
+def output(shape, blocks, solution):
+    solve_map = [solution.index(block) for block in blocks]
+    exe_map = [blocks.index(block) for block in solution]
+
+    with open(join("exe", "in.txt"), "w") as exe_input:
+        exe_input.writelines("%d %d\n" % shape)
+        for i in exe_map:
+            exe_input.writelines("%d\n" % i)
+    with open("marked.txt", "w") as solve_input:
+        for i in solve_map:
+            solve_input.writelines("%d\n" % i)
 
 
 def marker(shape, img):
@@ -235,6 +307,16 @@ def marker(shape, img):
     pieces = split(shape, image)
     blocks = list(map(Block, pieces))
     good_mark(blocks)
-    matrices = make_matrix(shape, blocks)
-    matrix = max_matrix(matrices)
-    return matrix
+    solutions = []
+    while True:
+        vertical = input("Vertical? (default NOT):")
+        solutions = [fill(shape, blocks, solution, vertical) for solution in make_matrix(shape, blocks)]
+        preview(shape, solutions)
+        if not input("Redo? (Press any key continue) "):
+            break
+    if len(solutions) != 1:
+        solution = solutions[int(input("Choose a solve (default 0): ") or 0)]
+    else:
+        solution = solutions[0]
+    output(shape, blocks, solution)
+    return solution
